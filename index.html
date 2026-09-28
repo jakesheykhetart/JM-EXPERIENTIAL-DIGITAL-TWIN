@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jewish Museum Walkthrough</title>
+<style>
+  :root {
+    --ink: #f4efe6;
+    --warm: #ffedcc;
+    --dim: #050505;
+    --line: rgba(255,237,204,.55);
+    --font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0b0b0b; color: var(--ink); font-family: var(--font); }
+  body.locked { overflow: hidden; }
+
+  #track { position: relative; }
+  #stage { position: sticky; top: 0; height: 100vh; height: 100svh; width: 100%; overflow: hidden; background: #0b0b0b; }
+  #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: pan-y; }
+  #gl.drag { cursor: grabbing; }
+  #hot { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #hot polygon { fill: rgba(255,237,204,0); stroke: rgba(255,237,204,0); stroke-width: 2px; cursor: pointer; pointer-events: all; transition: fill .15s, stroke .15s; }
+  #hot polygon:hover, #hot polygon:focus-visible { fill: rgba(255,237,204,.10); stroke: var(--warm); outline: none; }
+
+  .hud { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 24px calc(16px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 16px; pointer-events: none; background: linear-gradient(transparent, rgba(0,0,0,.55)); }
+  .hud .label { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--warm); white-space: nowrap; }
+  .hud .bar { flex: 1; height: 2px; background: rgba(255,255,255,.2); position: relative; }
+  .hud .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--warm); transition: width .3s; }
+  #loading { position: absolute; top: 18px; left: 24px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.6); }
+
+  /* opening crawl: scroll drives it up, scrolling back sends it down again */
+  #crawl { position: absolute; inset: 0; z-index: 5; overflow: hidden; pointer-events: none; perspective: 360px; perspective-origin: 50% 20%; }
+  #crawlShade { position: absolute; inset: 0; z-index: 4; pointer-events: none; background: linear-gradient(rgba(0,0,0,.92), rgba(0,0,0,.55) 45%, rgba(0,0,0,.7)); }
+  #crawlTilt { position: absolute; left: 50%; bottom: 0; width: min(760px, 88vw); transform: translateX(-50%) rotateX(24deg); transform-origin: 50% 100%; }
+  #crawlText { transform: translateY(100%); text-align: center; color: var(--warm); will-change: transform; }
+  #crawlText h2 { font-size: clamp(28px, 5vw, 56px); letter-spacing: .06em; text-transform: uppercase; margin: 0 0 .9em; line-height: 1.1; }
+  #crawlText p { font-size: clamp(19px, 2.6vw, 30px); line-height: 1.45; margin: 0 0 1.1em; text-align: justify; hyphens: auto; }
+  #crawlText .small { font-size: clamp(14px, 1.7vw, 18px); letter-spacing: .16em; text-transform: uppercase; text-align: center; }
+  #crawlCue { position: absolute; left: 0; right: 0; bottom: 70px; z-index: 6; text-align: center; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: rgba(255,237,204,.8); pointer-events: none; transition: opacity .4s; }
+  #crawlCue b { display: block; font-size: 22px; animation: bob 1.6s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(6px); } }
+  @media (prefers-reduced-motion: reduce) { #crawlTilt { transform: translateX(-50%); } #crawlCue b { animation: none; } }
+  #edit { position: absolute; top: 12px; right: 12px; z-index: 30; background: rgba(0,0,0,.75); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
+  #edit .row { display: flex; gap: 6px; } #edit .btn { padding: 8px 10px; font-size: 11px; }
+
+  #pop { position: fixed; inset: 0; z-index: 40; display: none; background: var(--dim); }
+  #pop.open { display: block; }
+  #pop .view { position: absolute; inset: 64px 24px 30px; display: flex; gap: 32px; }
+  #art { position: relative; flex: 1; min-width: 0; overflow: hidden; touch-action: none; }
+  #art img { position: absolute; left: 0; top: 0; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; max-width: none; }
+  /* museum label: plain white type, no glow */
+  #label { flex: 0 0 320px; align-self: center; color: #fff; }
+  #label[hidden] { display: none; }
+  #label .artist { font-size: 22px; font-weight: 600; margin: 0 0 8px; line-height: 1.25; }
+  #label .work { font-size: 20px; font-style: italic; margin: 0 0 8px; line-height: 1.3; }
+  #label .date { font-size: 17px; margin: 0 0 18px; color: rgba(255,255,255,.85); }
+  #label .note { font-size: 15px; line-height: 1.5; margin: 0 0 16px; color: rgba(255,255,255,.85); }
+  #label .thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+  #label .thumbs button { padding: 0; border: 2px solid transparent; background: none; border-radius: 4px; cursor: pointer; }
+  #label .thumbs button.on { border-color: #fff; }
+  #label .thumbs img { display: block; height: 60px; }
+  #pop .bar { position: absolute; top: 0; left: 0; right: 0; min-height: 64px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; }
+  #pop .title { flex: 1 1 0; min-width: 0; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btn { appearance: none; border: 1.5px solid var(--line); background: rgba(0,0,0,.5); color: #fff; font: 700 12px/1 var(--font); letter-spacing: .12em; text-transform: uppercase; padding: 10px 14px; border-radius: 6px; cursor: pointer; }
+  .btn:hover, .btn:focus-visible { background: rgba(40,33,24,.8); border-color: var(--warm); outline: none; }
+  .btn.on { color: var(--warm); border-color: var(--warm); }
+  .chev { position: absolute; right: 36px; top: 50%; transform: translateY(-50%); width: 104px; height: 104px; border-radius: 50%; font-size: 64px; line-height: 96px; padding: 0; text-align: center; }
+  .chev-label { position: absolute; right: 16px; top: calc(50% + 66px); width: 144px; text-align: center; font-size: 11px; letter-spacing: .14em; color: var(--warm); text-transform: uppercase; }
+  .hint { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 11px; letter-spacing: .14em; color: rgba(255,237,204,.75); text-transform: uppercase; pointer-events: none; }
+  .curtain { position: absolute; top: 0; bottom: 0; width: 50%; background: linear-gradient(90deg, #4e0409, #7a0a12 40%, #4e0409); transition: transform 1.8s cubic-bezier(.6,0,.2,1) .5s; z-index: 2; }
+  .curtain.l { left: 0; } .curtain.r { right: 0; }
+  .theatre.open .curtain.l { transform: translateX(-102%); }
+  .theatre.open .curtain.r { transform: translateX(102%); }
+  @media (max-width: 700px) {
+    #pop .view { left: 8px; right: 8px; flex-direction: column; gap: 12px; }
+    #label { flex: 0 0 auto; align-self: stretch; max-height: 36%; overflow: auto; padding: 0 6px; }
+    #label .artist { font-size: 18px; margin-bottom: 4px; } #label .work { font-size: 17px; margin-bottom: 4px; }
+    #label .date { font-size: 15px; margin-bottom: 8px; } #label .note { font-size: 14px; }
+    .chev { width: 72px; height: 72px; font-size: 44px; line-height: 66px; right: 14px; }
+    .chev-label { right: 0; width: 100px; top: calc(50% + 46px); }
+  }
+  @media (prefers-reduced-motion: reduce) { .curtain { transition: none; } }
+</style>
+</head>
+<body>
+
+<div id="track">
+  <div id="stage">
+    <canvas id="gl" aria-label="360 degree view of the gallery. Drag to look around, scroll to move."></canvas>
+    <svg id="hot" aria-label="Clickable artworks"></svg>
+    <div id="loading">Loading…</div>
+    <div id="crawlShade"></div>
+    <div id="crawl" aria-hidden="false"><div id="crawlTilt"><div id="crawlText">
+      <h2>The Jewish Museum</h2>
+      <p class="small">Identity, Culture, and Community · A virtual walkthrough</p>
+      <p>Welcome to the permanent collection of the Jewish Museum in New York. This walkthrough lets you move through the galleries at your own pace, stopping wherever you like.</p>
+      <p><strong>To walk,</strong> scroll down. Each step moves you a little over a meter forward along the path. Scroll back up to retrace your steps.</p>
+      <p><strong>To look around,</strong> drag left or right with your mouse or finger. You can turn a full circle at every stop and look up and down with a mouse.</p>
+      <p><strong>Works with a warm glowing frame are clickable.</strong> Click one to open its label, then zoom in with the + and − buttons, your scroll wheel, or a pinch.</p>
+      <p>Some works hold more: a wall text in four languages, and a theatre where you can watch a film.</p>
+      <p class="small">Keep scrolling to enter the galleries</p>
+    </div></div></div>
+    <div id="crawlCue"><span>Scroll to begin</span><b>&darr;</b></div>
+    <div class="hud"><span class="label">Drag to look · scroll to walk</span><span class="bar"><i id="prog"></i></span></div>
+  </div>
+</div>
+
+
+
+<div id="pop" role="dialog" aria-modal="true" aria-labelledby="popTitle">
+  <div class="bar">
+    <button class="btn" id="back" hidden>&lsaquo; Back</button>
+    <div class="title" id="popTitle"></div>
+    <span id="langs"></span>
+    <button class="btn" id="zin" aria-label="Zoom in">+</button>
+    <button class="btn" id="zout" aria-label="Zoom out">&minus;</button>
+    <button class="btn" id="close">Close</button>
+  </div>
+  <div class="view" id="view"><div id="art"></div><div id="label" hidden></div></div>
+  <button class="btn chev" id="chev" hidden aria-label="Enter">&rsaquo;</button>
+  <div class="chev-label" id="chevLabel" hidden></div>
+  <div class="hint" id="hint"></div>
+</div>
+
+<script>
+/* ---------------- content: pop-up per artwork (keyed by the "popup" name in stops.json) ---------------- */
+/* Standard pop-up template: give artist / title / date (+ optional note) and an image; the page builds the label.
+   Special pop-ups add: next (a second page such as the theatre film), type "langs" (wall text in several languages),
+   images (several pictures with thumbnails). Images: src = quick preview, full = high-res loaded when zooming in. */
+const IMG = {"ARK": {"full": "art/ARK.webp", "w": 2048, "h": 2048, "src": "art/ARK_s.webp"}, "BOLTANSKI": {"full": "art/BOLTANSKI.webp", "w": 1531, "h": 1165, "src": "art/BOLTANSKI_s.webp"}, "CARPET": {"full": "art/CARPET.webp", "w": 2048, "h": 2048, "src": "art/CARPET_s.webp"}, "FRANCKEN": {"full": "art/FRANCKEN.webp", "w": 3145, "h": 4096, "src": "art/FRANCKEN_s.webp"}, "FRANKFORT": {"full": "art/FRANKFORT.webp", "w": 4096, "h": 4096, "src": "art/FRANKFORT_s.webp"}, "IRON_CERKOV": {"full": "art/IRON_CERKOV.webp", "w": 512, "h": 256, "src": "art/IRON_CERKOV.webp"}, "IRON_CHURCH": {"full": "art/IRON_CHURCH.webp", "w": 512, "h": 1024, "src": "art/IRON_CHURCH.webp"}, "IRON_NW1918": {"full": "art/IRON_NW1918.webp", "w": 1024, "h": 1024, "src": "art/IRON_NW1918.webp"}, "JENNYS": {"full": "art/JENNYS.webp", "w": 256, "h": 512, "src": "art/JENNYS.webp"}, "LIPMAN": {"full": "art/LIPMAN.webp", "w": 883, "h": 1248, "src": "art/LIPMAN.webp"}, "MANIEVICH": {"full": "art/MANIEVICH.webp", "w": 1024, "h": 1024, "src": "art/MANIEVICH.webp"}, "OPPENHEIM": {"full": "art/OPPENHEIM.webp", "w": 512, "h": 512, "src": "art/OPPENHEIM.webp"}, "ROVNER": {"full": "art/ROVNER.webp", "w": 512, "h": 512, "src": "art/ROVNER.webp"}, "SASOON": {"full": "art/SASOON.webp", "w": 546, "h": 700, "src": "art/SASOON.webp"}, "STUART": {"full": "art/STUART.webp", "w": 412, "h": 501, "src": "art/STUART.webp"}};
+const POPUPS = {
+  BOLTANSKI_TOMBSTONE: { artist: "Christian Boltanski", title: "Depart", date: "2015", img: IMG.BOLTANSKI },
+  ROVNER_TOMBSTONE: { artist: "Michal Rovner", title: "Dark Light", date: "2024", img: IMG.ROVNER,
+    next: { label: "Enter the theatre", heading: "The Theatre", type: "video", src: "media/rovner_james_excerpt.mp4", curtains: true } },
+  LANGS: { heading: "Identity, Culture, and Community", type: "langs",
+    langs: [["English", "panels/OPTION_II_EN.webp"], ["Español", "panels/OPTION_II_ES.webp"], ["Français", "panels/OPTION_II_FR.webp"], ["Deutsch", "panels/OPTION_II_DE.webp"]] },
+  SASOON_TOMBSTONE: { artist: "Attributed to William Melville", title: "David Sassoon", date: "Mid-nineteenth century", img: IMG.SASOON },
+  william_jennys: { artist: "William Jennys", title: "Frances Isaacs", date: "c. 1798", img: IMG.JENNYS,
+    note: "One of four portraits of the Isaacs family, members of Congregation Shearith Israel, New York." },
+  gilbert_stuart: { artist: "Gilbert Stuart", title: "Mrs. Aaron Lopez and Her Son Joshua", date: "1772–73", img: IMG.STUART },
+  LIPMAN_TOMBSTONE: { artist: "Beth Lipman", title: "Laid Table with Etrog Container and Pastry Mold", date: "2012", img: IMG.LIPMAN },
+  "1984-61_TOMBSTONE": { artist: "Moritz Daniel Oppenheim", title: "The Return of the Volunteer from the Wars of Liberation to His Family Still Living in Accordance with Old Customs", date: "1833–34", img: IMG.OPPENHEIM },
+  CARPET_TOMBSTONE: { artist: "", title: "Carpet", date: "1890s", img: IMG.CARPET },
+  FRANS_FRANCKENii: { artist: "Attributed to Frans Francken II", title: "Cabinet with Scenes from the Book of Esther", date: "c. 1620", img: IMG.FRANCKEN },
+  MANIEVICH_TOMBSTONE: { artist: "Abraham Manievich", title: "Destruction of the Ghetto, Kiev", date: "1919", img: IMG.MANIEVICH },
+  FRANKFROT_TOMBSTONE: { artist: "Dana Frankfort", title: "Star of David (Orange)", date: "2007", img: IMG.FRANKFORT },
+  TORAH_ARK_TOMBSTONE: { artist: "", title: "Torah Ark", date: "c. 1500, redesigned 1624", img: IMG.ARK },
+  IronChurchTombstone: { artist: "", title: "The Orthodox Church of Archbishop of Constantinople John Chrysostom", date: "Kyiv",
+    note: "One of the first iron churches in Kyiv. It survived the great fire of 1884. In 1934, on the eve of the Great Purge, Communist authorities demolished the church.",
+    images: [IMG.IRON_CHURCH, IMG.IRON_NW1918, IMG.IRON_CERKOV] }
+};
+const nameOf = w => [w.artist, w.title].filter(Boolean).join(", ") || w.heading || "";
+const MOBILE = Math.min(screen.width, screen.height) < 700 || innerWidth < 700;
+let PANO_DIR = MOBILE ? "pano_m" : "pano";
+const PX_PER_STOP = MOBILE ? 340 : 420;           // scroll distance per step (larger = slower)
+const STEP_MS = 600;                               // at most one step this often, however fast the scroll
+const CRAWL_PX = MOBILE ? 2000 : 2600;           // scroll distance used by the opening crawl
+const EDIT = /[?&]edit\b/.test(location.search);
+
+/* ---------------- WebGL panorama renderer ---------------- */
+const canvas = document.getElementById("gl");
+const gl = canvas.getContext("webgl", { antialias: false, alpha: false });
+const VS = `attribute vec2 p; varying vec2 v; void main(){ v = p; gl_Position = vec4(p, 0., 1.); }`;
+const FS = `precision highp float;
+varying vec2 v;
+uniform sampler2D A, B; uniform float mixAB, tanH, tanV;
+uniform vec3 F, R, U, F2, R2, U2;
+const float PI = 3.14159265;
+vec3 look(vec2 v, vec3 f, vec3 r, vec3 u){ return normalize(f + r * v.x * tanH + u * v.y * tanV); }
+vec2 uv(vec3 d){ return vec2(atan(d.y, d.x) / (2.0 * PI) + 0.5, 0.5 - asin(clamp(d.z, -1., 1.)) / PI); }
+void main(){
+  vec3 ca = texture2D(A, uv(look(v, F2, R2, U2))).rgb;
+  vec3 cb = texture2D(B, uv(look(v, F, R, U))).rgb;
+  gl_FragColor = vec4(mix(ca, cb, mixAB), 1.0);
+}`;
+function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; }
+const prog = gl.createProgram();
+gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog); gl.useProgram(prog);
+const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+if (gl.getParameter(gl.MAX_TEXTURE_SIZE) < 6144) PANO_DIR = "pano_m";
+const U_ = n => gl.getUniformLocation(prog, n);
+gl.uniform1i(U_("A"), 0); gl.uniform1i(U_("B"), 1);
+
+function makeTex(img) {
+  const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
+  return t;
+}
+
+/* ---------------- state ---------------- */
+let data, N = 0, tex = [], loadingSet = new Set();
+let yaw = 0, pitch = 0, fov = MOBILE ? 80 : 72;          // degrees; yaw/pitch in Unreal convention
+let cur = 0, prev = 0, fade = 1, fadeStart = 0;
+const FADE_MS = 380;
+
+function basis(y, p) {
+  const Y = y * Math.PI / 180, Pp = p * Math.PI / 180;
+  return {
+    F: [Math.cos(Pp) * Math.cos(Y), Math.cos(Pp) * Math.sin(Y), Math.sin(Pp)],
+    R: [-Math.sin(Y), Math.cos(Y), 0],
+    U: [-Math.sin(Pp) * Math.cos(Y), -Math.sin(Pp) * Math.sin(Y), Math.cos(Pp)]
+  };
+}
+function resize() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = Math.round(innerWidth * dpr); canvas.height = Math.round(innerHeight * dpr);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+function tans() {
+  // fov applies to the wider screen side
+  const t = Math.tan(fov * Math.PI / 360), ar = innerWidth / innerHeight;
+  return ar >= 1 ? [t, t / ar] : [t * ar, t];
+}
+function load(i) {
+  if (i < 0 || i >= N || tex[i] || loadingSet.has(i)) return;
+  loadingSet.add(i);
+  const im = new Image();
+  im.onload = () => { tex[i] = makeTex(im); loadingSet.delete(i); updateLoading(); };
+  im.onerror = () => loadingSet.delete(i);
+  im.src = `${PANO_DIR}/p${String(i).padStart(3, "0")}.webp`;
+}
+function updateLoading() {
+  const el = document.getElementById("loading");
+  el.textContent = tex[target] ? "" : "Loading…";
+}
+
+/* ---------------- movement: scroll picks the stop ---------------- */
+const track = document.getElementById("track");
+let target = 0;
+function stopFromScroll() {
+  return Math.max(0, Math.min(N - 1, Math.round((scrollY - CRAWL_PX) / PX_PER_STOP)));
+}
+const crawlText = document.getElementById("crawlText"), crawlShade = document.getElementById("crawlShade"), crawlCue = document.getElementById("crawlCue");
+function updateCrawl() {
+  const t = Math.max(0, Math.min(1, scrollY / CRAWL_PX));          // 0 = text below the screen, 1 = text gone into the distance
+  const h = crawlText.offsetHeight, H = innerHeight;
+  crawlText.style.transform = `translateY(${(1 - t) * (H * 1.05) - t * (h * 1.25)}px)`;
+  const fadeOut = Math.max(0, Math.min(1, (t - 0.82) / 0.18));
+  crawlText.style.opacity = 1 - fadeOut;
+  crawlShade.style.opacity = 1 - fadeOut;
+  crawlCue.style.opacity = t < 0.04 ? 1 : 0;
+}
+function onScroll() {
+  updateCrawl();
+  target = stopFromScroll();
+  document.getElementById("prog").style.width = (100 * target / Math.max(1, N - 1)) + "%";
+  for (let k = -2; k <= 4; k++) load(target + k);
+  updateLoading();
+}
+function go(i) {
+  if (i === cur || !tex[i]) return;
+  prev = cur; cur = i; fade = 0; fadeStart = performance.now();
+  lastStep = performance.now();
+  // the old view dissolves away as it was; the new panorama appears already facing its chosen first view (no camera motion)
+  prevYaw = yaw; prevPitch = pitch;
+  const v = data.stops[i].view || { yaw: data.stops[i].heading, pitch: 0 };
+  yaw = v.yaw; pitch = v.pitch;
+  if (EDIT) updateEdit();
+}
+let lastStep = 0, prevYaw = 0, prevPitch = 0;
+
+/* ---------------- look around: drag ---------------- */
+let dragging = null;
+canvas.addEventListener("pointerdown", e => { dragging = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: 0 }; canvas.setPointerCapture(e.pointerId); canvas.classList.add("drag"); });
+canvas.addEventListener("pointermove", e => {
+  if (!dragging || e.pointerId !== dragging.id) return;
+  const dx = e.clientX - dragging.x, dy = e.clientY - dragging.y;
+  dragging.x = e.clientX; dragging.y = e.clientY; dragging.moved += Math.abs(dx) + Math.abs(dy);
+  const k = 0.8 * fov / innerWidth;                 // degrees per pixel (a little slower than the finger)
+  yaw -= dx * k;                                    // drag the scene (Street View style)
+  if (e.pointerType === "mouse") pitch = Math.max(-80, Math.min(80, pitch + dy * k));
+});
+["pointerup", "pointercancel"].forEach(t => canvas.addEventListener(t, () => { dragging = null; canvas.classList.remove("drag"); }));
+addEventListener("keydown", e => {
+  if (document.getElementById("pop").classList.contains("open")) return;
+  if (e.key === "ArrowLeft") yaw -= 10; if (e.key === "ArrowRight") yaw += 10;
+});
+
+/* ---------------- hotspots ---------------- */
+const hot = document.getElementById("hot");
+// outline points are an ordered ring; clip the part behind the viewer instead of dropping the whole outline
+function clipProject(dirs, b, tH, tV) {
+  const cam = dirs.map(d => [d[0] * b.F[0] + d[1] * b.F[1] + d[2] * b.F[2], d[0] * b.R[0] + d[1] * b.R[1] + d[2] * b.R[2], d[0] * b.U[0] + d[1] * b.U[1] + d[2] * b.U[2]]);
+  const NEAR = 0.05, out = [];
+  for (let k = 0; k < cam.length; k++) {
+    const p = cam[k], q = cam[(k + 1) % cam.length];
+    if (p[0] >= NEAR) out.push(p);
+    if ((p[0] >= NEAR) !== (q[0] >= NEAR)) { const t = (NEAR - p[0]) / (q[0] - p[0]); out.push([NEAR, p[1] + t * (q[1] - p[1]), p[2] + t * (q[2] - p[2])]); }
+  }
+  return out.map(c => { const sx = c[1] / c[0] / tH, sy = c[2] / c[0] / tV;
+    return [Math.max(-4e4, Math.min(4e4, (sx + 1) / 2 * innerWidth)), Math.max(-4e4, Math.min(4e4, (1 - sy) / 2 * innerHeight))]; });
+}
+function project(d, b, tH, tV) {
+  const x = d[0] * b.F[0] + d[1] * b.F[1] + d[2] * b.F[2];
+  if (x <= 0.05) return null;
+  const sx = (d[0] * b.R[0] + d[1] * b.R[1] + d[2] * b.R[2]) / x / tH;
+  const sy = (d[0] * b.U[0] + d[1] * b.U[1] + d[2] * b.U[2]) / x / tV;
+  return [(sx + 1) / 2 * innerWidth, (1 - sy) / 2 * innerHeight];
+}
+function hull(ps) {
+  ps = ps.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const p of ps) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (const p of ps.reverse()) { while (up.length > 1 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+let hotKey = "";
+function drawHot(b, tH, tV) {
+  if (fade < 1 || scrollY < CRAWL_PX * 0.9) { if (hotKey) { hot.innerHTML = ""; hotKey = ""; } return; }
+  const spots = data.stops[cur].spots.filter(s => POPUPS[s.popup]);
+  let html = "";
+  for (const s of spots) {
+    const pts = clipProject(s.dirs, b, tH, tV);
+    if (pts.length < 3) continue;
+    const h = hull(pts);
+    const title = nameOf(POPUPS[s.popup]).replace(/"/g, "&quot;");
+    html += `<polygon tabindex="0" role="button" aria-label="${title}" data-p="${s.popup}" points="${h.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ")}"/>`;
+  }
+  if (html !== hotKey) { hot.innerHTML = html; hotKey = html; }
+}
+hot.addEventListener("click", e => { const p = e.target.dataset && e.target.dataset.p; if (p) openPopup(p); });
+hot.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset.p) { e.preventDefault(); openPopup(e.target.dataset.p); } });
+
+/* ---------------- frame loop ---------------- */
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!N || !tex[cur]) return;
+  if (fade < 1) fade = Math.min(1, (now - fadeStart) / FADE_MS);
+  // one step at a time toward where the scroll points
+  if (target !== cur && fade >= 1 && now - lastStep > STEP_MS) {
+    const nxt = cur + Math.sign(target - cur);
+    if (tex[nxt]) go(nxt); else load(nxt);
+  }
+  const e = fade * fade * (3 - 2 * fade);
+  const b = basis(yaw, pitch), [tH, tV] = tans();
+  gl.uniform3fv(U_("F"), b.F); gl.uniform3fv(U_("R"), b.R); gl.uniform3fv(U_("U"), b.U);
+  gl.uniform1f(U_("tanH"), tH); gl.uniform1f(U_("tanV"), tV);
+  const b2 = fade < 1 ? basis(prevYaw, prevPitch) : b;
+  gl.uniform3fv(U_("F2"), b2.F); gl.uniform3fv(U_("R2"), b2.R); gl.uniform3fv(U_("U2"), b2.U);
+  gl.uniform1f(U_("mixAB"), fade < 1 ? e : 1);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex[fade < 1 ? prev : cur]);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tex[cur]);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  drawHot(b, tH, tV);
+}
+
+fetch("stops.json").then(r => r.json()).then(d => {
+  data = d; N = d.stops.length;
+  track.style.height = `calc(100vh + ${(N - 1) * PX_PER_STOP}px)`;
+  const v0 = d.stops[0].view || { yaw: d.stops[0].heading, pitch: 0 };
+  yaw = v0.yaw; pitch = v0.pitch;
+  track.style.height = `calc(100vh + ${CRAWL_PX + (N - 1) * PX_PER_STOP}px)`;
+  updateCrawl();
+  if (EDIT) setupEdit();
+  resize(); addEventListener("resize", resize);
+  addEventListener("scroll", onScroll, { passive: true });
+  target = 0; for (let k = 0; k < 5; k++) load(k);
+  const first = setInterval(() => { if (tex[0]) { clearInterval(first); cur = 0; fade = 1; updateLoading(); } }, 50);
+  requestAnimationFrame(frame);
+});
+
+/* ---------------- editor (?edit): set each panorama's first view ---------------- */
+let editEl;
+function setupEdit() {
+  editEl = document.createElement("div"); editEl.id = "edit";
+  editEl.innerHTML = `<div id="eInfo"></div>
+    <div class="row"><button class="btn" id="ePrev">&lsaquo; Stop</button><button class="btn" id="eNext">Stop &rsaquo;</button></div>
+    <button class="btn" id="eSet">Set as first view</button>
+    <button class="btn" id="eCopy">Copy all views</button>`;
+  document.getElementById("stage").appendChild(editEl);
+  const jump = k => scrollTo(0, CRAWL_PX + Math.max(0, Math.min(N - 1, cur + k)) * PX_PER_STOP);
+  editEl.querySelector("#ePrev").onclick = () => jump(-1);
+  editEl.querySelector("#eNext").onclick = () => jump(1);
+  editEl.querySelector("#eSet").onclick = () => { data.stops[cur].view = { yaw: +(((yaw + 540) % 360) - 180).toFixed(1), pitch: +pitch.toFixed(1), set: true }; updateEdit(); };
+  editEl.querySelector("#eCopy").onclick = () => {
+    const txt = JSON.stringify(data.stops.map(s => ({ i: s.i, yaw: s.view.yaw, pitch: s.view.pitch })));
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => { editEl.querySelector("#eCopy").textContent = "Copied — paste to Claude"; },
+      () => prompt("Copy these views", txt));
+  };
+  setInterval(updateEdit, 250);
+}
+function updateEdit() {
+  if (!editEl) return;
+  const v = data.stops[cur].view;
+  editEl.querySelector("#eInfo").innerHTML = `Stop ${cur + 1} / ${N}<br>Now: yaw ${(((yaw + 540) % 360) - 180).toFixed(0)}°, pitch ${pitch.toFixed(0)}°<br>First view: ${v.yaw.toFixed(0)}° ${v.set ? "✓ set" : "(default)"}`;
+}
+
+/* ---------------- pop-ups: template label + zoomable image (high-res loads as you zoom) ---------------- */
+const pop = document.getElementById("pop"), view = document.getElementById("view");
+const artEl = document.getElementById("art"), labelEl = document.getElementById("label");
+const titleEl = document.getElementById("popTitle"), langsEl = document.getElementById("langs");
+const chev = document.getElementById("chev"), chevLabel = document.getElementById("chevLabel");
+const backBtn = document.getElementById("back"), hint = document.getElementById("hint");
+const zin = document.getElementById("zin"), zout = document.getElementById("zout");
+const barEl = pop.querySelector(".bar");
+let z = { s: 1, fit: 1, x: 0, y: 0, el: null, w: 1, h: 1, item: null, hi: false }, page = null, lastFocus = null;
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+function openPopup(name) {
+  if (!POPUPS[name]) return;
+  lastFocus = document.activeElement;
+  page = { work: POPUPS[name], sub: false };
+  document.body.classList.add("locked"); pop.classList.add("open");
+  showPage(); document.getElementById("close").focus();
+}
+function closePop() {
+  artEl.innerHTML = ""; z.el = null; pop.classList.remove("open"); document.body.classList.remove("locked");
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+function fitTop() { view.style.top = barEl.offsetHeight + "px"; }
+function showPage(langIndex = 0) {
+  const w = page.work, p = page.sub ? w.next : w;
+  backBtn.hidden = !page.sub;
+  chev.hidden = chevLabel.hidden = page.sub || !w.next;
+  chevLabel.textContent = w.next ? w.next.label : "";
+  langsEl.innerHTML = ""; artEl.innerHTML = ""; z.el = null;
+  zin.hidden = zout.hidden = p.type === "video";
+  titleEl.textContent = p.heading || "";
+  if (p.type === "video") {
+    labelEl.hidden = true; hint.textContent = "";
+    artEl.innerHTML = `<div class="theatre" style="position:absolute;inset:0;background:#000">
+      <video src="${p.src}" controls playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain"></video>
+      ${p.curtains ? '<div class="curtain l"></div><div class="curtain r"></div>' : ""}</div>`;
+    const th = artEl.firstChild, v = th.querySelector("video");
+    requestAnimationFrame(() => requestAnimationFrame(() => th.classList.add("open")));
+    setTimeout(() => v.play().catch(() => {}), p.curtains ? 1600 : 0);
+    fitTop(); return;
+  }
+  if (p.type === "langs") {
+    labelEl.hidden = true;
+    p.langs.forEach(([nm], j) => {
+      const b = document.createElement("button");
+      b.className = "btn" + (j === langIndex ? " on" : ""); b.textContent = nm; b.onclick = () => showPage(j);
+      langsEl.appendChild(b);
+    });
+    fitTop();
+    setImage({ src: p.langs[langIndex][1] });
+  } else {
+    const imgs = p.images || [p.img];
+    labelEl.hidden = false;
+    labelEl.innerHTML = (p.artist ? `<p class="artist">${esc(p.artist)}</p>` : "") +
+      `<p class="work">${esc(p.title)}</p>` + (p.date ? `<p class="date">${esc(p.date)}</p>` : "") +
+      (p.note ? `<p class="note">${esc(p.note)}</p>` : "") +
+      (imgs.length > 1 ? `<div class="thumbs">${imgs.map((im, j) => `<button class="${j ? "" : "on"}" data-j="${j}" aria-label="Picture ${j + 1}"><img src="${im.src}" alt=""></button>`).join("")}</div>` : "");
+    labelEl.querySelectorAll(".thumbs button").forEach(b => b.onclick = () => {
+      labelEl.querySelectorAll(".thumbs button").forEach(x => x.classList.toggle("on", x === b));
+      setImage(imgs[+b.dataset.j]);
+    });
+    fitTop();
+    setImage(imgs[0]);
+  }
+  hint.textContent = "Scroll or pinch to zoom · drag to move";
+}
+function setImage(item) {
+  const im = new Image(); im.alt = nameOf(page.work); im.decoding = "async";
+  z.item = item; z.hi = !item.full || item.full === item.src;
+  const place = (w, h) => {
+    z.w = w; z.h = h; im.style.width = w + "px"; im.style.height = h + "px";   // laid out at full-res size; the preview is stretched until the full image arrives
+    const vw = artEl.clientWidth, vh = artEl.clientHeight;
+    z.fit = Math.min(vw / w, vh / h);
+    z.s = z.fit; z.x = (vw - w * z.s) / 2; z.y = (vh - h * z.s) / 2; apply();
+  };
+  im.onload = () => { if (!item.w) place(im.naturalWidth, im.naturalHeight); };
+  im.onerror = () => { hint.textContent = "This image could not be loaded."; };
+  im.src = item.src; artEl.innerHTML = ""; artEl.appendChild(im); z.el = im;
+  if (item.w) place(item.w, item.h);
+}
+function maybeHiRes() {
+  if (z.hi || !z.el || !z.item) return;
+  const shown = z.w * z.s * (devicePixelRatio || 1);            // screen pixels across the image
+  const prevW = z.item.w * 1400 / Math.max(z.item.w, z.item.h);  // preview resolution
+  if (shown <= prevW * 1.05) return;
+  z.hi = true; const el = z.el, pre = new Image();
+  hint.textContent = "Loading full resolution…";
+  pre.onload = () => { if (z.el === el) el.src = pre.src; hint.textContent = "Scroll or pinch to zoom · drag to move"; };
+  pre.src = z.item.full;
+}
+function apply() { if (z.el) { z.el.style.transform = `translate(${z.x}px,${z.y}px) scale(${z.s})`; maybeHiRes(); } }
+function zoomAt(f, cx, cy) {
+  if (!z.el) return;
+  const ns = Math.max(z.fit, Math.min(Math.max(z.fit * 10, 2), z.s * f));
+  z.x = cx - (cx - z.x) * (ns / z.s); z.y = cy - (cy - z.y) * (ns / z.s); z.s = ns;
+  if (ns === z.fit) { z.x = (artEl.clientWidth - z.w * ns) / 2; z.y = (artEl.clientHeight - z.h * ns) / 2; }
+  apply();
+}
+artEl.addEventListener("wheel", e => { e.preventDefault(); const r = artEl.getBoundingClientRect(); zoomAt(Math.pow(1.0015, -e.deltaY), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+const pts = new Map(); let pinch = 0;
+artEl.addEventListener("pointerdown", e => { artEl.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); });
+artEl.addEventListener("pointermove", e => {
+  if (!pts.has(e.pointerId) || !z.el) return;
+  const pv = pts.get(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pts.size === 2) {
+    const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), r = artEl.getBoundingClientRect();
+    if (pinch) zoomAt(d / pinch, (a[0] + b[0]) / 2 - r.left, (a[1] + b[1]) / 2 - r.top);
+    pinch = d;
+  } else if (z.s > z.fit) { z.x += e.clientX - pv[0]; z.y += e.clientY - pv[1]; apply(); }
+});
+["pointerup", "pointercancel"].forEach(t => artEl.addEventListener(t, e => { pts.delete(e.pointerId); pinch = 0; }));
+zin.onclick = () => zoomAt(1.5, artEl.clientWidth / 2, artEl.clientHeight / 2);
+zout.onclick = () => zoomAt(1 / 1.5, artEl.clientWidth / 2, artEl.clientHeight / 2);
+document.getElementById("close").onclick = closePop;
+chev.onclick = () => { page.sub = true; showPage(); };
+backBtn.onclick = () => { page.sub = false; showPage(); };
+pop.addEventListener("click", e => { if (e.target === pop || e.target === view) closePop(); });
+addEventListener("keydown", e => { if (e.key === "Escape" && pop.classList.contains("open")) closePop(); });
+addEventListener("resize", () => { if (pop.classList.contains("open") && z.item) { fitTop(); setImage(z.item); } });
+</script>
+</body>
+</html>
