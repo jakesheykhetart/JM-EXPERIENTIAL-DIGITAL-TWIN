@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Jewish Museum Walkthrough</title>
 <style>
+  /* Apercu Pro Regular: uses the visitor's installed copy, or fonts/ApercuPro-Regular.woff2 if added to the site */
+  @font-face { font-family: "Apercu Pro"; font-weight: 400; font-style: normal; font-display: swap;
+    src: local("Apercu Pro Regular"), local("ApercuPro-Regular"), local("Apercu Pro"), url("fonts/ApercuPro-Regular.woff2") format("woff2"); }
   :root {
     --ink: #f4efe6;
     --warm: #ffedcc;
@@ -39,11 +42,11 @@
   #crawlText h2, #endText h2 { font-size: clamp(28px, 5vw, 56px); letter-spacing: .06em; text-transform: uppercase; margin: 0 0 .9em; line-height: 1.1; }
   #crawlText p, #endText p { font-size: clamp(19px, 2.6vw, 30px); line-height: 1.45; margin: 0 0 1.1em; text-align: justify; hyphens: auto; }
   #crawlText p { text-align: center; }
-  #crawlText .walk { display: block; font-weight: 900; font-size: 1.45em; letter-spacing: .03em; text-transform: uppercase; text-align: center; color: #fff; margin-bottom: .25em; }
+  #crawlText .walk { display: block; font-family: "Apercu Pro", "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 400; font-size: 1.45em; letter-spacing: .03em; text-transform: uppercase; text-align: center; color: var(--warm); margin-bottom: .25em; }
   #endText h2.end { font-size: clamp(48px, 9vw, 110px); font-weight: 900; letter-spacing: .1em; margin-bottom: .45em; }
   #endText .small, #crawlText .small { font-size: clamp(14px, 1.7vw, 18px); letter-spacing: .16em; text-transform: uppercase; text-align: center; }
   #crawlCue { position: absolute; left: 0; right: 0; top: 7%; z-index: 6; text-align: center; color: #fff; pointer-events: none; transition: opacity .35s; }
-  #crawlCue span { display: block; font-weight: 900; font-size: clamp(30px, 5.2vw, 64px); letter-spacing: .12em; text-transform: uppercase; line-height: 1.05; text-shadow: 0 2px 18px rgba(0,0,0,.7); }
+  #crawlCue span { display: block; font-family: "Apercu Pro", "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 400; color: var(--warm); font-size: clamp(30px, 5.2vw, 64px); letter-spacing: .12em; text-transform: uppercase; line-height: 1.05; text-shadow: 0 2px 18px rgba(0,0,0,.7); }
   #crawlCue b { display: block; margin-top: .15em; font-size: clamp(64px, 10vw, 128px); line-height: 1; color: var(--warm); animation: bob 1.4s ease-in-out infinite; text-shadow: 0 2px 18px rgba(0,0,0,.7); }
   @keyframes bob { 50% { transform: translateY(18px); } }
   @media (prefers-reduced-motion: reduce) { #crawlTilt, #endTilt { transform: translateX(-50%); } #crawlCue b { animation: none; } }
@@ -104,7 +107,7 @@
       <h2>The Jewish Museum</h2>
       <p class="small">Identity, Culture, and Community · A virtual walkthrough</p>
       <p>Welcome to the permanent collection of the Jewish Museum.</p>
-      <p><strong class="walk">To walk, scroll down.</strong></p>
+      <p><strong>To walk, scroll down.</strong></p>
       <p><strong>To look around, drag left or right.</strong></p>
       <p><strong>Works with a warm glowing frame are clickable.</strong></p>
       <p class="small">Continue scrolling to enter the galleries</p>
