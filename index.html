@@ -38,14 +38,19 @@
   #crawlText, #endText { transform: translateY(100%); text-align: center; color: var(--warm); will-change: transform; }
   #crawlText h2, #endText h2 { font-size: clamp(28px, 5vw, 56px); letter-spacing: .06em; text-transform: uppercase; margin: 0 0 .9em; line-height: 1.1; }
   #crawlText p, #endText p { font-size: clamp(19px, 2.6vw, 30px); line-height: 1.45; margin: 0 0 1.1em; text-align: justify; hyphens: auto; }
+  #crawlText p { text-align: center; }
   #crawlText .walk { display: block; font-weight: 900; font-size: 1.45em; letter-spacing: .03em; text-transform: uppercase; text-align: center; color: #fff; margin-bottom: .25em; }
   #endText h2.end { font-size: clamp(48px, 9vw, 110px); font-weight: 900; letter-spacing: .1em; margin-bottom: .45em; }
   #endText .small, #crawlText .small { font-size: clamp(14px, 1.7vw, 18px); letter-spacing: .16em; text-transform: uppercase; text-align: center; }
-  #crawlCue { position: absolute; left: 0; right: 0; bottom: 70px; z-index: 6; text-align: center; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: rgba(255,237,204,.8); pointer-events: none; transition: opacity .4s; }
-  #crawlCue b { display: block; font-size: 22px; animation: bob 1.6s ease-in-out infinite; }
-  @keyframes bob { 50% { transform: translateY(6px); } }
+  #crawlCue { position: absolute; left: 0; right: 0; top: 7%; z-index: 6; text-align: center; color: #fff; pointer-events: none; transition: opacity .35s; }
+  #crawlCue span { display: block; font-weight: 900; font-size: clamp(30px, 5.2vw, 64px); letter-spacing: .12em; text-transform: uppercase; line-height: 1.05; text-shadow: 0 2px 18px rgba(0,0,0,.7); }
+  #crawlCue b { display: block; margin-top: .15em; font-size: clamp(64px, 10vw, 128px); line-height: 1; color: var(--warm); animation: bob 1.4s ease-in-out infinite; text-shadow: 0 2px 18px rgba(0,0,0,.7); }
+  @keyframes bob { 50% { transform: translateY(18px); } }
   @media (prefers-reduced-motion: reduce) { #crawlTilt, #endTilt { transform: translateX(-50%); } #crawlCue b { animation: none; } }
-  #edit { position: absolute; top: 12px; right: 12px; z-index: 30; background: rgba(0,0,0,.75); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
+  #fs { position: absolute; top: 14px; right: 14px; z-index: 20; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; border-radius: 8px; }
+  #fs svg { width: 20px; height: 20px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; }
+  #fs[hidden] { display: none; }
+  #edit { position: absolute; top: 70px; right: 12px; z-index: 30; background: rgba(0,0,0,.75); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
   #edit .row { display: flex; gap: 6px; } #edit .btn { padding: 8px 10px; font-size: 11px; }
 
   #pop { position: fixed; inset: 0; z-index: 40; display: none; background: var(--dim); }
@@ -98,12 +103,11 @@
     <div id="crawl" aria-hidden="false"><div id="crawlTilt"><div id="crawlText">
       <h2>The Jewish Museum</h2>
       <p class="small">Identity, Culture, and Community · A virtual walkthrough</p>
-      <p>Welcome to the permanent collection of the Jewish Museum in New York. This walkthrough lets you move through the galleries at your own pace, stopping wherever you like.</p>
-      <p><strong class="walk">To walk, scroll down.</strong> Each step moves you a little over a meter forward along the path. Scroll back up to retrace your steps.</p>
-      <p><strong>To look around,</strong> drag left or right with your mouse or finger. You can turn a full circle at every stop and look up and down with a mouse.</p>
-      <p><strong>Works with a warm glowing frame are clickable.</strong> Click one to open its label, then zoom in with the + and − buttons, your scroll wheel, or a pinch.</p>
-      <p>Some works hold more: a wall text in four languages, and a theatre where you can watch a film.</p>
-      <p class="small">Keep scrolling to enter the galleries</p>
+      <p>Welcome to the permanent collection of the Jewish Museum.</p>
+      <p><strong class="walk">To walk, scroll down.</strong></p>
+      <p><strong>To look around, drag left or right.</strong></p>
+      <p><strong>Works with a warm glowing frame are clickable.</strong></p>
+      <p class="small">Continue scrolling to enter the galleries</p>
     </div></div></div>
     <div id="endShade" style="position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;background:linear-gradient(rgba(0,0,0,.92),rgba(0,0,0,.6) 45%,rgba(0,0,0,.75))"></div>
     <div id="endCrawl" aria-live="polite"><div id="endTilt"><div id="endText">
@@ -114,6 +118,10 @@
       <p>Scroll back up to retrace your steps and revisit any of the works along the way.</p>
       <p class="small">Part 2 coming soon</p>
     </div></div></div>
+    <button class="btn" id="fs" aria-label="Full screen" title="Full screen">
+      <svg id="fsOn" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      <svg id="fsOff" viewBox="0 0 24 24" style="display:none"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+    </button>
     <div id="crawlCue"><span>Scroll to begin</span><b>&darr;</b></div>
     <div class="hud"><span class="label">Drag to look · scroll to walk</span><span class="bar"><i id="prog"></i></span></div>
   </div>
@@ -141,7 +149,7 @@
 /* Standard pop-up template: give artist / title / date (+ optional note) and an image; the page builds the label.
    Special pop-ups add: next (a second page such as the theatre film), type "langs" (wall text in several languages),
    images (several pictures with thumbnails). Images: src = quick preview, full = high-res loaded when zooming in. */
-const IMG = {"ARK": {"full": "art/ARK.webp", "w": 2048, "h": 2048, "src": "art/ARK_s.webp"}, "BOLTANSKI": {"full": "art/BOLTANSKI.webp", "w": 1531, "h": 1165, "src": "art/BOLTANSKI_s.webp"}, "CARPET": {"full": "art/CARPET.webp", "w": 2048, "h": 2048, "src": "art/CARPET_s.webp"}, "FRANCKEN": {"full": "art/FRANCKEN.webp", "w": 3145, "h": 4096, "src": "art/FRANCKEN_s.webp"}, "FRANKFORT": {"full": "art/FRANKFORT.webp", "w": 4096, "h": 4096, "src": "art/FRANKFORT_s.webp"}, "IRON_CERKOV": {"full": "art/IRON_CERKOV.webp", "w": 512, "h": 256, "src": "art/IRON_CERKOV.webp"}, "IRON_CHURCH": {"full": "art/IRON_CHURCH.webp", "w": 512, "h": 1024, "src": "art/IRON_CHURCH.webp"}, "IRON_NW1918": {"full": "art/IRON_NW1918.webp", "w": 1024, "h": 1024, "src": "art/IRON_NW1918.webp"}, "JENNYS": {"full": "art/JENNYS.webp", "w": 256, "h": 512, "src": "art/JENNYS.webp"}, "LIPMAN": {"full": "art/LIPMAN.webp", "w": 883, "h": 1248, "src": "art/LIPMAN.webp"}, "MANIEVICH": {"full": "art/MANIEVICH.webp", "w": 1024, "h": 1024, "src": "art/MANIEVICH.webp"}, "OPPENHEIM": {"full": "art/OPPENHEIM.webp", "w": 512, "h": 512, "src": "art/OPPENHEIM.webp"}, "ROVNER": {"full": "art/ROVNER.webp", "w": 512, "h": 512, "src": "art/ROVNER.webp"}, "SASOON": {"full": "art/SASOON.webp", "w": 546, "h": 700, "src": "art/SASOON.webp"}, "STUART": {"full": "art/STUART.webp", "w": 412, "h": 501, "src": "art/STUART.webp"}};
+const IMG = {"ARK": {"full": "art/ARK.webp", "w": 2048, "h": 2048, "src": "art/ARK_s.webp"}, "BOLTANSKI": {"full": "art/BOLTANSKI.webp", "w": 1531, "h": 1165, "src": "art/BOLTANSKI_s.webp"}, "CARPET": {"full": "art/CARPET.webp", "w": 2048, "h": 2048, "src": "art/CARPET_s.webp"}, "FRANCKEN": {"full": "art/FRANCKEN.webp", "w": 3145, "h": 4096, "src": "art/FRANCKEN_s.webp"}, "FRANKFORT": {"full": "art/FRANKFORT.webp", "w": 4096, "h": 4096, "src": "art/FRANKFORT_s.webp"}, "IRON_CERKOV": {"full": "art/IRON_CERKOV.webp", "w": 512, "h": 256, "src": "art/IRON_CERKOV.webp"}, "IRON_CHURCH": {"full": "art/IRON_CHURCH.webp", "w": 512, "h": 1024, "src": "art/IRON_CHURCH.webp"}, "IRON_NW1918": {"full": "art/IRON_NW1918.webp", "w": 1024, "h": 1024, "src": "art/IRON_NW1918.webp"}, "JENNYS": {"full": "art/JENNYS.webp", "w": 824, "h": 1024, "src": "art/JENNYS.webp"}, "LIPMAN": {"full": "art/LIPMAN.webp", "w": 883, "h": 1248, "src": "art/LIPMAN.webp"}, "MANIEVICH": {"full": "art/MANIEVICH.webp", "w": 1024, "h": 1024, "src": "art/MANIEVICH.webp"}, "OPPENHEIM": {"full": "art/OPPENHEIM.webp", "w": 512, "h": 512, "src": "art/OPPENHEIM.webp"}, "ROVNER": {"full": "art/ROVNER.webp", "w": 512, "h": 512, "src": "art/ROVNER.webp"}, "SASOON": {"full": "art/SASOON.webp", "w": 546, "h": 700, "src": "art/SASOON.webp"}, "STUART": {"full": "art/STUART.webp", "w": 412, "h": 501, "src": "art/STUART.webp"}};
 const POPUPS = {
   BOLTANSKI_TOMBSTONE: { artist: "Christian Boltanski", title: "Depart", date: "2015", img: IMG.BOLTANSKI },
   ROVNER_TOMBSTONE: { artist: "Michal Rovner", title: "Dark Light", date: "2024", img: IMG.ROVNER,
@@ -268,7 +276,7 @@ function updateCrawl() {
   const fadeOut = Math.max(0, Math.min(1, (t - 0.82) / 0.18));
   crawlText.style.opacity = 1 - fadeOut;
   crawlShade.style.opacity = 1 - fadeOut;
-  crawlCue.style.opacity = t < 0.04 ? 1 : 0;
+  crawlCue.style.opacity = scrollY < 12 ? 1 : 0;       // disappears the moment the visitor starts scrolling
 }
 function onScroll() {
   updateCrawl();
@@ -535,6 +543,25 @@ backBtn.onclick = () => { page.sub = false; showPage(); };
 pop.addEventListener("click", e => { if (e.target === pop || e.target === view) closePop(); });
 addEventListener("keydown", e => { if (e.key === "Escape" && pop.classList.contains("open")) closePop(); });
 addEventListener("resize", () => { if (pop.classList.contains("open") && z.item) { fitTop(); setImage(z.item); } });
+
+/* ---------------- full screen ---------------- */
+(function () {
+  const btn = document.getElementById("fs"), on = document.getElementById("fsOn"), off = document.getElementById("fsOff");
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const exit = () => (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  const inFrame = window.self !== window.top;
+  const canFs = !!req && (document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  // iPhone Safari has no page full screen: inside an embed, open the tour in its own tab instead; on its own page the browser is already full size
+  if (!canFs && !inFrame) { btn.hidden = true; return; }
+  btn.onclick = () => {
+    if (!canFs) { window.open(location.href, "_blank", "noopener"); return; }
+    if (fsEl()) exit(); else { const r = req.call(el); if (r && r.catch) r.catch(() => window.open(location.href, "_blank", "noopener")); }
+  };
+  const sync = () => { const f = !!fsEl(); on.style.display = f ? "none" : ""; off.style.display = f ? "" : "none"; btn.setAttribute("aria-label", f ? "Exit full screen" : "Full screen"); btn.title = btn.getAttribute("aria-label"); };
+  document.addEventListener("fullscreenchange", sync); document.addEventListener("webkitfullscreenchange", sync);
+})();
 </script>
 </body>
 </html>
