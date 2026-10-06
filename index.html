@@ -371,9 +371,47 @@ canvas.addEventListener("pointermove", e => {
   yaw -= dx * k;                                    // drag the scene (Street View style)
   if (e.pointerType === "mouse") pitch = Math.max(-80, Math.min(80, pitch + dy * k));
 });
+let lastDragMoved = 0;
 canvas.addEventListener("pointerup", e => {
   const d = dragging; dragging = null; canvas.classList.remove("drag");
+  if (d) lastDragMoved = d.moved;
   if (d && d.popup && d.id === e.pointerId && d.moved < TAP_PX) openPopup(d.popup);
+});
+/* Phones: a finger always wobbles a little, and the browser cancels pointer events as soon as it thinks a scroll
+   has started, so the pointer-based tap above can be lost. The browser's own "click" fires for every real tap on a
+   work (never for a scroll), so it opens the pop-up too. After a mouse drag (moved more than a tap) it is ignored. */
+/* iPhone (Safari): the outlines are redrawn whenever the view or the screen height changes (Safari's toolbar
+   grows/shrinks as you touch), which can swallow the pointer and click events of a tap. So a short, still touch is
+   also checked against where the outlines are on screen, independent of the elements themselves. */
+function hitTest(x, y) {
+  for (let k = hotShapes.length - 1; k >= 0; k--) {
+    const h = hotShapes[k].h; let inside = false;
+    for (let i = 0, j = h.length - 1; i < h.length; j = i++) {
+      if ((h[i][1] > y) !== (h[j][1] > y) && x < (h[j][0] - h[i][0]) * (y - h[i][1]) / (h[j][1] - h[i][1]) + h[i][0]) inside = !inside;
+    }
+    if (inside) return hotShapes[k].p;
+  }
+  return null;
+}
+let touchTap = null;
+const stageEl = document.getElementById("stage");
+stageEl.addEventListener("touchstart", e => {
+  touchTap = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: performance.now(), sy: scrollY } : null;
+}, { passive: true });
+stageEl.addEventListener("touchmove", e => {
+  if (touchTap && e.touches.length === 1 && Math.hypot(e.touches[0].clientX - touchTap.x, e.touches[0].clientY - touchTap.y) > 14) touchTap = null;
+}, { passive: true });
+stageEl.addEventListener("touchend", e => {
+  const t = touchTap; touchTap = null;
+  if (!t || pop.classList.contains("open") || performance.now() - t.t > 700 || Math.abs(scrollY - t.sy) > 14) return;
+  const p = hitTest(t.x, t.y);
+  if (p) { e.preventDefault(); dragging = null; canvas.classList.remove("drag"); openPopup(p); }   // preventDefault: no ghost click afterwards
+}, { passive: false });
+document.getElementById("hot").addEventListener("click", e => {
+  const p = e.target.dataset && e.target.dataset.p;
+  if (!p || pop.classList.contains("open")) return;
+  if (e.pointerType === "mouse" && lastDragMoved >= TAP_PX) return;
+  openPopup(p);
 });
 canvas.addEventListener("pointercancel", () => { dragging = null; canvas.classList.remove("drag"); });
 addEventListener("keydown", e => {
@@ -410,15 +448,15 @@ function hull(ps) {
   for (const p of ps.reverse()) { while (up.length > 1 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
   return lo.slice(0, -1).concat(up.slice(0, -1));
 }
-let hotKey = "";
+let hotKey = "", hotShapes = [];
 function drawHot(b, tH, tV) {
-  if (fade < 1 || scrollY < CRAWL_PX * 0.9 || scrollY > endStart() + END_PX * 0.15) { if (hotKey) { hot.innerHTML = ""; hotKey = ""; } return; }
+  if (fade < 1 || scrollY < CRAWL_PX * 0.9 || scrollY > endStart() + END_PX * 0.15) { hotShapes = []; if (hotKey) { hot.innerHTML = ""; hotKey = ""; } return; }
   const spots = data.stops[cur].spots.filter(s => POPUPS[s.popup]);
-  let html = "";
+  let html = ""; hotShapes = [];
   for (const s of spots) {
     const pts = clipProject(s.dirs, b, tH, tV);
     if (pts.length < 3) continue;
-    const h = hull(pts);
+    const h = hull(pts); hotShapes.push({ p: s.popup, h });
     const title = nameOf(POPUPS[s.popup]).replace(/"/g, "&quot;");
     html += `<polygon tabindex="0" role="button" aria-label="${title}" data-p="${s.popup}" points="${h.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ")}"/>`;
   }
@@ -532,13 +570,14 @@ const chev = document.getElementById("chev"), chevLabel = document.getElementByI
 const backBtn = document.getElementById("back"), hint = document.getElementById("hint");
 const zin = document.getElementById("zin"), zout = document.getElementById("zout");
 const barEl = pop.querySelector(".bar");
+let popOpenedAt = 0;
 let z = { s: 1, fit: 1, x: 0, y: 0, el: null, w: 1, h: 1, item: null, hi: false }, page = null, lastFocus = null;
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 function openPopup(name) {
-  if (!POPUPS[name]) return;
+  if (!POPUPS[name] || pop.classList.contains("open")) return;
   lastFocus = document.activeElement;
-  page = { work: POPUPS[name], sub: false };
+  page = { work: POPUPS[name], sub: false }; popOpenedAt = performance.now();
   document.body.classList.add("locked"); pop.classList.add("open");
   showPage(); document.getElementById("close").focus();
 }
@@ -671,7 +710,7 @@ zout.onclick = () => zoomAt(1 / 1.5, artEl.clientWidth / 2, artEl.clientHeight /
 document.getElementById("close").onclick = closePop;
 chev.onclick = () => { page.sub = true; showPage(); };
 backBtn.onclick = () => { page.sub = false; showPage(); };
-pop.addEventListener("click", e => { if (e.target === pop || e.target === view) closePop(); });
+pop.addEventListener("click", e => { if (performance.now() - popOpenedAt < 600) return; if (e.target === pop || e.target === view) closePop(); });
 addEventListener("keydown", e => { if (e.key === "Escape" && pop.classList.contains("open")) closePop(); });
 addEventListener("resize", () => { if (pop.classList.contains("open") && z.item) { fitTop(); setImage(z.item); } });
 

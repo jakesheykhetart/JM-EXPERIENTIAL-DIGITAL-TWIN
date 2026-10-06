@@ -1,7 +1,19 @@
 {
   "default": "current",
   "shows": [
-    { "id": "2025", "label": "2025", "title": "The 2025 installation", "stops": "stops.json" },
-    { "id": "current", "label": "CURRENT", "title": "The current installation", "dir": "versions/2026-10/", "from": 6, "stops": "versions/2026-10/stops.json" }
+    {
+      "id": "2025",
+      "label": "2025",
+      "title": "The 2025 installation",
+      "stops": "stops.json"
+    },
+    {
+      "id": "current",
+      "label": "CURRENT",
+      "title": "The current installation",
+      "dir": "versions/2026-10/",
+      "from": 5,
+      "stops": "versions/2026-10/stops.json"
+    }
   ]
 }
