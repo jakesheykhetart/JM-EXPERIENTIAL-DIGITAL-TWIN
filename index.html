@@ -28,7 +28,7 @@
   #hot polygon { touch-action: pan-y; fill: rgba(255,237,204,0); stroke: rgba(255,237,204,0); stroke-width: 2px; cursor: pointer; pointer-events: all; transition: fill .15s, stroke .15s; }
   #hot polygon:hover, #hot polygon:focus-visible { fill: rgba(255,237,204,.10); stroke: var(--warm); outline: none; }
 
-  .hud { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 24px calc(16px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 16px; pointer-events: none; background: linear-gradient(transparent, rgba(0,0,0,.55)); }
+  .hud { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 76px calc(16px + env(safe-area-inset-bottom)) 24px; display: flex; align-items: center; gap: 16px; pointer-events: none; background: linear-gradient(transparent, rgba(0,0,0,.55)); }
   .hud .label { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--warm); white-space: nowrap; }
   .hud .bar { flex: 1; height: 2px; background: rgba(255,255,255,.2); position: relative; }
   .hud .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--warm); transition: width .3s; }
@@ -50,9 +50,17 @@
   #crawlCue b { display: block; margin-top: .15em; font-size: clamp(64px, 10vw, 128px); line-height: 1; color: var(--warm); animation: bob 1.4s ease-in-out infinite; text-shadow: 0 2px 18px rgba(0,0,0,.7); }
   @keyframes bob { 50% { transform: translateY(18px); } }
   @media (prefers-reduced-motion: reduce) { #crawlTilt, #endTilt { transform: translateX(-50%); } #crawlCue b { animation: none; } }
-  #fs { position: absolute; top: 14px; right: 14px; z-index: 20; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; border-radius: 8px; }
+  #fs { position: absolute; bottom: calc(10px + env(safe-area-inset-bottom)); right: 14px; z-index: 20; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; border-radius: 8px; }
   #fs svg { width: 20px; height: 20px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; }
   #fs[hidden] { display: none; }
+  /* show switch (living replica): one tab per installation, top right */
+  #shows { position: absolute; top: 14px; right: 14px; z-index: 20; display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: rgba(0,0,0,.45); border: 1px solid rgba(255,237,204,.25); }
+  #shows button { appearance: none; border: 0; background: none; color: rgba(255,237,204,.6); font: 700 13px/1 var(--font); letter-spacing: .16em; padding: 10px 14px; border-radius: 7px; cursor: pointer; transition: color .2s, text-shadow .2s, background .2s, box-shadow .2s; }
+  #shows button.on { color: #1a140c; background: var(--warm); }
+  @media (hover: hover) {
+    #shows button:not(.on):hover { color: #fff6e6; text-shadow: 0 0 6px #ffedcc, 0 0 14px rgba(255,210,140,.95), 0 0 28px rgba(255,190,110,.8); box-shadow: inset 0 0 0 1px rgba(255,237,204,.8), 0 0 18px rgba(255,200,120,.55); }
+  }
+  #shows button:focus-visible { outline: 2px solid var(--warm); outline-offset: 2px; }
   #edit { position: absolute; top: 70px; right: 12px; z-index: 30; background: rgba(0,0,0,.75); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
   #edit .row { display: flex; gap: 6px; } #edit .btn { padding: 8px 10px; font-size: 11px; }
 
@@ -68,6 +76,13 @@
   #label .work { font-size: 20px; font-style: italic; margin: 0 0 8px; line-height: 1.3; }
   #label .date { font-size: 17px; margin: 0 0 18px; color: rgba(255,255,255,.85); }
   #label .note { font-size: 15px; line-height: 1.5; margin: 0 0 16px; color: rgba(255,255,255,.85); }
+  /* extended museum label (title / place / materials / credit / text) */
+  #label .lt { font-size: 21px; font-weight: 600; margin: 0 0 10px; line-height: 1.25; }
+  #label .lm { font-size: 16px; margin: 0 0 4px; line-height: 1.35; color: rgba(255,255,255,.92); }
+  #label .lc { font-size: 12px; margin: 12px 0 0; line-height: 1.45; color: rgba(255,255,255,.7); }
+  #label .lx { font-size: 15px; line-height: 1.55; margin: 18px 0 0; color: rgba(255,255,255,.88); }
+  #label.long { align-self: stretch; overflow-y: auto; padding-right: 6px; display: flex; flex-direction: column; justify-content: safe center; }
+  #label .go-next { margin-top: 16px; color: var(--warm); border-color: var(--warm); }
   #label .thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
   #label .thumbs button { padding: 0; border: 2px solid transparent; background: none; border-radius: 4px; cursor: pointer; }
   #label .thumbs button.on { border-color: #fff; }
@@ -84,7 +99,10 @@
   .curtain.l { left: 0; } .curtain.r { right: 0; }
   .theatre.open .curtain.l { transform: translateX(-102%); }
   .theatre.open .curtain.r { transform: translateX(102%); }
+  model-viewer { position: absolute; inset: 0; width: 100%; height: 100%; background: transparent; --poster-color: transparent; }
   @media (max-width: 700px) {
+    #shows { top: 10px; right: 10px; } #shows button { font-size: 12px; padding: 9px 11px; }
+    #label .lt { font-size: 17px; } #label .lm { font-size: 14px; } #label .lx { font-size: 14px; margin-top: 10px; }
     #pop .view { left: 8px; right: 8px; flex-direction: column; gap: 12px; }
     #label { flex: 0 0 auto; align-self: stretch; max-height: 36%; overflow: auto; padding: 0 6px; }
     #label .artist { font-size: 18px; margin-bottom: 4px; } #label .work { font-size: 17px; margin-bottom: 4px; }
@@ -125,6 +143,7 @@
       <svg id="fsOn" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
       <svg id="fsOff" viewBox="0 0 24 24" style="display:none"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
     </button>
+    <div id="shows" role="tablist" aria-label="Installation"></div>
     <div id="crawlCue"><span>Scroll to begin</span><b>&darr;</b></div>
     <div class="hud"><span class="label">Drag to look · scroll to walk</span><span class="bar"><i id="prog"></i></span></div>
   </div>
@@ -174,7 +193,36 @@ const POPUPS = {
     note: "One of the first iron churches in Kyiv. It survived the great fire of 1884. In 1934, on the eve of the Great Purge, Communist authorities demolished the church.",
     images: [IMG.IRON_CHURCH, IMG.IRON_NW1918, IMG.IRON_CERKOV] }
 };
-const nameOf = w => [w.artist, w.title].filter(Boolean).join(", ") || w.heading || "";
+/* CURRENT show (2026-10): pop-ups for the new installation in gallery 3-02 */
+const IMG_2610 = {"SAINT_ANNE": {"full": "versions/2026-10/art/SAINT_ANNE.webp", "src": "versions/2026-10/art/SAINT_ANNE_s.webp", "w": 1711, "h": 2127},
+                  "SPICE_001": {"full": "versions/2026-10/art/SPICE_001.webp", "src": "versions/2026-10/art/SPICE_001_s.webp", "w": 2000, "h": 3000}};
+/* Label template (new works): title / place / medium / credit (lines) / text, all copied from the museum label.
+   model: a GLB shown on a second page ("View in 3D"); it turns around its own centre, zoom has a near and far limit. */
+Object.assign(POPUPS, {
+  SPICE_CONTAINER: { label: {
+      title: "Spice container, first half of the nineteenth century",
+      place: "Poland or Russia",
+      medium: "Engraved, punched, cast, and rolled silver",
+      credit: ["The Jewish Museum, Gift of Dr. Harry G. Friedman, F 2622",
+               "Provenance: unknown owner; acquired by Harry G. Friedman for the Jewish Museum, 1950s"],
+      text: "These spice containers take the form of leafy plants crowned by bulbous fruits. Filled with fragrant spices, they were used in the Havdalah ceremony (Hebrew for \u201cseparation\u201d) that marks the end of the sacred time of the Sabbath and the beginning of the new week. Havdalah, which takes place after sundown, includes the kindling of a candle, the light of which would have reflected dramatically on these intricate silver objects as they were passed from person to person to smell the spices within." },
+    img: IMG_2610.SPICE_001,
+    next: { label: "View in 3D", heading: "Spice container \u00b7 3D", type: "model", src: "versions/2026-10/models/spice_container_001.glb" } },
+  SAINT_ANNE: { label: {
+      title: "Reliquary bust of Saint Anne with the Virgin and Child, c. 1500",
+      place: "Prague",
+      medium: "Parcel-gilt silver, precious stones, and glass",
+      credit: ["The Metropolitan Chapter of St. Vitus in Prague"],
+      text: "In this bust of Saint Anne, the mother of the Virgin Mary, a glass window set into the chest frames a relic believed to be a piece of Anne\u2019s robes. Cradled in Anne\u2019s arms are miniature figures of Mary and the Christ Child, linking three generations of the Holy Family." },
+    img: IMG_2610.SAINT_ANNE }
+});
+const nameOf = w => (w.label && w.label.title) || [w.artist, w.title].filter(Boolean).join(", ") || w.heading || "";
+
+/* ---------------- shows: one tab per installation (versions.json) ---------------- */
+let SHOWS = [], show = null;
+const showData = {};                     // id -> stops.json of that show
+function panoKey(i) { return show && show.dir && i >= show.from ? show.id + ":" + i : "base:" + i; }
+function panoUrl(i) { const pre = show && show.dir && i >= show.from ? show.dir : ""; return `${pre}${PANO_DIR}/p${String(i).padStart(3, "0")}.webp`; }
 const MOBILE = Math.min(screen.width, screen.height) < 700 || innerWidth < 700;
 let PANO_DIR = MOBILE ? "pano_m" : "pano";
 const PX_PER_STOP = MOBILE ? 227 : 280;           // scroll distance per step (larger = slower)
@@ -220,7 +268,8 @@ function makeTex(img) {
 }
 
 /* ---------------- state ---------------- */
-let data, N = 0, tex = [], loadingSet = new Set();
+let data, N = 0, texMap = new Map(), loadingSet = new Set();
+const T = i => texMap.get(panoKey(i));
 let yaw = 0, pitch = 0, fov = MOBILE ? 80 : 72;          // degrees; yaw/pitch in Unreal convention
 let cur = 0, prev = 0, fade = 1, fadeStart = 0;
 const FADE_MS = 380;
@@ -244,16 +293,18 @@ function tans() {
   return ar >= 1 ? [t, t / ar] : [t * ar, t];
 }
 function load(i) {
-  if (i < 0 || i >= N || tex[i] || loadingSet.has(i)) return;
-  loadingSet.add(i);
+  if (i < 0 || i >= N) return;
+  const key = panoKey(i);
+  if (texMap.has(key) || loadingSet.has(key)) return;
+  loadingSet.add(key);
   const im = new Image();
-  im.onload = () => { tex[i] = makeTex(im); loadingSet.delete(i); updateLoading(); };
-  im.onerror = () => loadingSet.delete(i);
-  im.src = `${PANO_DIR}/p${String(i).padStart(3, "0")}.webp`;
+  im.onload = () => { texMap.set(key, makeTex(im)); loadingSet.delete(key); updateLoading(); };
+  im.onerror = () => loadingSet.delete(key);
+  im.src = panoUrl(i);
 }
 function updateLoading() {
   const el = document.getElementById("loading");
-  el.textContent = tex[target] ? "" : "Loading…";
+  el.textContent = T(target) ? "" : "Loading…";
 }
 
 /* ---------------- movement: scroll picks the stop ---------------- */
@@ -289,8 +340,8 @@ function onScroll() {
   updateLoading();
 }
 function go(i) {
-  if (i === cur || !tex[i]) return;
-  prev = cur; cur = i; fade = 0; fadeStart = performance.now();
+  if (i === cur || !T(i)) return;
+  prevTex = T(cur); prev = cur; cur = i; fade = 0; fadeStart = performance.now();
   lastStep = performance.now();
   // the old view dissolves away as it was; the new panorama appears already facing its chosen first view (no camera motion)
   prevYaw = yaw; prevPitch = pitch;
@@ -298,7 +349,7 @@ function go(i) {
   yaw = v.yaw; pitch = v.pitch;
   if (EDIT) updateEdit();
 }
-let lastStep = 0, prevYaw = 0, prevPitch = 0;
+let lastStep = 0, prevYaw = 0, prevPitch = 0, prevTex = null;
 
 /* ---------------- look around: drag ---------------- */
 let dragging = null;
@@ -378,12 +429,12 @@ hot.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") 
 /* ---------------- frame loop ---------------- */
 function frame(now) {
   requestAnimationFrame(frame);
-  if (!N || !tex[cur]) return;
+  if (!N || !T(cur)) return;
   if (fade < 1) fade = Math.min(1, (now - fadeStart) / FADE_MS);
   // one step at a time toward where the scroll points
   if (target !== cur && fade >= 1 && now - lastStep > STEP_MS) {
     const nxt = cur + Math.sign(target - cur);
-    if (tex[nxt]) go(nxt); else load(nxt);
+    if (T(nxt)) go(nxt); else load(nxt);
   }
   const e = fade * fade * (3 - 2 * fade);
   const b = basis(yaw, pitch), [tH, tV] = tans();
@@ -392,13 +443,47 @@ function frame(now) {
   const b2 = fade < 1 ? basis(prevYaw, prevPitch) : b;
   gl.uniform3fv(U_("F2"), b2.F); gl.uniform3fv(U_("R2"), b2.R); gl.uniform3fv(U_("U2"), b2.U);
   gl.uniform1f(U_("mixAB"), fade < 1 ? e : 1);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex[fade < 1 ? prev : cur]);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tex[cur]);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, fade < 1 ? (prevTex || T(cur)) : T(cur));
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, T(cur));
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   drawHot(b, tH, tV);
 }
 
-fetch("stops.json").then(r => r.json()).then(d => {
+function getStops(sh) {
+  if (showData[sh.id]) return Promise.resolve(showData[sh.id]);
+  return fetch(sh.stops || "stops.json").then(r => r.json()).then(d => (showData[sh.id] = d));
+}
+function buildShowTabs() {
+  const box = document.getElementById("shows");
+  if (SHOWS.length < 2) { box.hidden = true; return; }
+  box.innerHTML = SHOWS.map(sh => `<button role="tab" data-id="${sh.id}" aria-selected="${sh === show}" class="${sh === show ? "on" : ""}" title="${sh.title || sh.label}">${sh.label}</button>`).join("");
+  box.querySelectorAll("button").forEach(b => b.onclick = () => switchShow(b.dataset.id));
+}
+/* switching keeps you on the same stop, looking the same way; the gallery changes around you */
+function switchShow(id) {
+  const sh = SHOWS.find(x => x.id === id);
+  if (!sh || sh === show) return;
+  getStops(sh).then(d => {
+    const keepYaw = yaw, keepPitch = pitch, oldTex = T(cur);
+    show = sh; data = d; buildShowTabs();
+    try { history.replaceState(null, "", "#" + sh.id); } catch (_) {}
+    hotKey = ""; hot.innerHTML = "";
+    for (let k = -2; k <= 4; k++) load(target + k);
+    const swap = setInterval(() => {
+      if (!T(cur)) return;
+      clearInterval(swap);
+      prevTex = oldTex; prevYaw = keepYaw; prevPitch = keepPitch; yaw = keepYaw; pitch = keepPitch;
+      fade = oldTex === T(cur) ? 1 : 0; fadeStart = performance.now(); updateLoading();
+    }, 30);
+  });
+}
+fetch("versions.json").then(r => r.ok ? r.json() : null).catch(() => null).then(v => {
+  SHOWS = v && v.shows && v.shows.length ? v.shows : [{ id: "base", label: "", stops: "stops.json" }];
+  const want = (location.hash || "").slice(1);
+  show = SHOWS.find(x => x.id === want) || SHOWS.find(x => x.id === (v && v.default)) || SHOWS[0];
+  buildShowTabs();
+  return getStops(show);
+}).then(d => {
   data = d; N = d.stops.length;
   track.style.height = `calc(100vh + ${(N - 1) * PX_PER_STOP}px)`;
   const v0 = d.stops[0].view || { yaw: d.stops[0].heading, pitch: 0 };
@@ -409,7 +494,7 @@ fetch("stops.json").then(r => r.json()).then(d => {
   resize(); addEventListener("resize", resize);
   addEventListener("scroll", onScroll, { passive: true });
   target = 0; for (let k = 0; k < 5; k++) load(k);
-  const first = setInterval(() => { if (tex[0]) { clearInterval(first); cur = 0; fade = 1; updateLoading(); } }, 50);
+  const first = setInterval(() => { if (T(0)) { clearInterval(first); cur = 0; fade = 1; updateLoading(); } }, 50);
   requestAnimationFrame(frame);
 });
 
@@ -471,11 +556,12 @@ function fitTop() { view.style.top = barEl.offsetHeight + "px"; }
 function showPage(langIndex = 0) {
   const w = page.work, p = page.sub ? w.next : w;
   backBtn.hidden = !page.sub;
-  chev.hidden = chevLabel.hidden = page.sub || !w.next;
+  chev.hidden = chevLabel.hidden = page.sub || !w.next || !!w.label;   // label pop-ups carry their own "next" button
   chevLabel.textContent = w.next ? w.next.label : "";
   stopMedia();
   langsEl.innerHTML = ""; artEl.innerHTML = ""; z.el = null;
-  zin.hidden = zout.hidden = p.type === "video";
+  zin.hidden = zout.hidden = p.type === "video" || p.type === "model";
+  labelEl.classList.remove("long");
   titleEl.textContent = p.heading || "";
   if (p.type === "video") {
     labelEl.hidden = true; hint.textContent = "";
@@ -486,6 +572,18 @@ function showPage(langIndex = 0) {
     requestAnimationFrame(() => requestAnimationFrame(() => th.classList.add("open")));
     playTimer = setTimeout(() => { if (v.isConnected && pop.classList.contains("open")) v.play().catch(() => {}); }, p.curtains ? 1600 : 0);
     fitTop(); return;
+  }
+  if (p.type === "model") {
+    labelEl.hidden = true; fitTop();
+    hint.textContent = "Drag to turn · scroll or pinch to zoom";
+    ensureModelViewer().then(() => {
+      if (!pop.classList.contains("open") || !page.sub) return;
+      artEl.innerHTML = `<model-viewer src="${p.src}" alt="${esc(nameOf(w))} in 3D" camera-controls disable-pan
+        interaction-prompt="none" touch-action="none" environment-image="neutral" exposure="1.1" shadow-intensity="0.6"
+        camera-orbit="0deg 78deg 105%" min-camera-orbit="auto 10deg 55%" max-camera-orbit="auto 170deg 170%"
+        field-of-view="30deg" min-field-of-view="10deg" max-field-of-view="45deg"></model-viewer>`;
+    });
+    return;
   }
   if (p.type === "langs") {
     labelEl.hidden = true;
@@ -499,6 +597,16 @@ function showPage(langIndex = 0) {
   } else {
     const imgs = p.images || [p.img];
     labelEl.hidden = false;
+    if (p.label) {
+      const L = p.label;
+      labelEl.classList.add("long");
+      labelEl.innerHTML = `<p class="lt">${esc(L.title)}</p>` + (L.place ? `<p class="lm">${esc(L.place)}</p>` : "") +
+        (L.medium ? `<p class="lm">${esc(L.medium)}</p>` : "") +
+        (L.credit ? `<p class="lc">${L.credit.map(esc).join("<br>")}</p>` : "") +
+        (w.next ? `<p><button class="btn go-next" type="button">${esc(w.next.label)} &rsaquo;</button></p>` : "") +
+        (L.text ? `<p class="lx">${esc(L.text)}</p>` : "");
+      const gn = labelEl.querySelector(".go-next"); if (gn) gn.onclick = () => { page.sub = true; showPage(); };
+    } else
     labelEl.innerHTML = (p.artist ? `<p class="artist">${esc(p.artist)}</p>` : "") +
       `<p class="work">${esc(p.title)}</p>` + (p.date ? `<p class="date">${esc(p.date)}</p>` : "") +
       (p.note ? `<p class="note">${esc(p.note)}</p>` : "") +
@@ -565,6 +673,17 @@ backBtn.onclick = () => { page.sub = false; showPage(); };
 pop.addEventListener("click", e => { if (e.target === pop || e.target === view) closePop(); });
 addEventListener("keydown", e => { if (e.key === "Escape" && pop.classList.contains("open")) closePop(); });
 addEventListener("resize", () => { if (pop.classList.contains("open") && z.item) { fitTop(); setImage(z.item); } });
+
+/* 3D viewer: loaded only when a 3D page is first opened */
+let mvLoading = null;
+function ensureModelViewer() {
+  if (customElements.get("model-viewer")) return Promise.resolve();
+  if (!mvLoading) mvLoading = new Promise((ok, bad) => {
+    const sc = document.createElement("script"); sc.type = "module"; sc.src = "lib/model-viewer.min.js";
+    sc.onload = () => customElements.whenDefined("model-viewer").then(ok); sc.onerror = bad; document.head.appendChild(sc);
+  });
+  return mvLoading;
+}
 
 /* ---------------- full screen ---------------- */
 (function () {
