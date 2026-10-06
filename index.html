@@ -652,9 +652,10 @@ function zoomAt(f, cx, cy) {
   if (ns === z.fit) { z.x = (artEl.clientWidth - z.w * ns) / 2; z.y = (artEl.clientHeight - z.h * ns) / 2; }
   apply();
 }
-artEl.addEventListener("wheel", e => { e.preventDefault(); const r = artEl.getBoundingClientRect(); zoomAt(Math.pow(1.0015, -e.deltaY), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+const onModel = e => !!(e.target && e.target.closest && e.target.closest("model-viewer"));   // the 3D viewer handles its own drag and zoom
+artEl.addEventListener("wheel", e => { if (onModel(e)) return; e.preventDefault(); const r = artEl.getBoundingClientRect(); zoomAt(Math.pow(1.0015, -e.deltaY), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
 const pts = new Map(); let pinch = 0;
-artEl.addEventListener("pointerdown", e => { artEl.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); });
+artEl.addEventListener("pointerdown", e => { if (onModel(e)) return; artEl.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); });
 artEl.addEventListener("pointermove", e => {
   if (!pts.has(e.pointerId) || !z.el) return;
   const pv = pts.get(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
