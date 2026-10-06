@@ -25,7 +25,7 @@
   #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: pan-y; }
   #gl.drag { cursor: grabbing; }
   #hot { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-  #hot polygon { fill: rgba(255,237,204,0); stroke: rgba(255,237,204,0); stroke-width: 2px; cursor: pointer; pointer-events: all; transition: fill .15s, stroke .15s; }
+  #hot polygon { touch-action: pan-y; fill: rgba(255,237,204,0); stroke: rgba(255,237,204,0); stroke-width: 2px; cursor: pointer; pointer-events: all; transition: fill .15s, stroke .15s; }
   #hot polygon:hover, #hot polygon:focus-visible { fill: rgba(255,237,204,.10); stroke: var(--warm); outline: none; }
 
   .hud { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 24px calc(16px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 16px; pointer-events: none; background: linear-gradient(transparent, rgba(0,0,0,.55)); }
@@ -302,7 +302,16 @@ let lastStep = 0, prevYaw = 0, prevPitch = 0;
 
 /* ---------------- look around: drag ---------------- */
 let dragging = null;
-canvas.addEventListener("pointerdown", e => { dragging = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: 0 }; canvas.setPointerCapture(e.pointerId); canvas.classList.add("drag"); });
+const TAP_PX = 10;                                  // moves shorter than this count as a tap
+function startDrag(e, popup) {
+  if (e.button !== undefined && e.button > 0) return;
+  dragging = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: 0, popup };
+  try { canvas.setPointerCapture(e.pointerId); } catch (_) {}   // the drag keeps going even as outlines redraw under the finger
+  canvas.classList.add("drag");
+}
+canvas.addEventListener("pointerdown", e => startDrag(e, null));
+// pressing on a glowing work starts a drag too; if it hardly moves it is a tap and opens the work
+document.getElementById("hot").addEventListener("pointerdown", e => { const p = e.target.dataset && e.target.dataset.p; if (p) { e.preventDefault(); startDrag(e, p); } });
 canvas.addEventListener("pointermove", e => {
   if (!dragging || e.pointerId !== dragging.id) return;
   const dx = e.clientX - dragging.x, dy = e.clientY - dragging.y;
@@ -311,7 +320,11 @@ canvas.addEventListener("pointermove", e => {
   yaw -= dx * k;                                    // drag the scene (Street View style)
   if (e.pointerType === "mouse") pitch = Math.max(-80, Math.min(80, pitch + dy * k));
 });
-["pointerup", "pointercancel"].forEach(t => canvas.addEventListener(t, () => { dragging = null; canvas.classList.remove("drag"); }));
+canvas.addEventListener("pointerup", e => {
+  const d = dragging; dragging = null; canvas.classList.remove("drag");
+  if (d && d.popup && d.id === e.pointerId && d.moved < TAP_PX) openPopup(d.popup);
+});
+canvas.addEventListener("pointercancel", () => { dragging = null; canvas.classList.remove("drag"); });
 addEventListener("keydown", e => {
   if (document.getElementById("pop").classList.contains("open")) return;
   if (e.key === "ArrowLeft") yaw -= 10; if (e.key === "ArrowRight") yaw += 10;
@@ -360,7 +373,6 @@ function drawHot(b, tH, tV) {
   }
   if (html !== hotKey) { hot.innerHTML = html; hotKey = html; }
 }
-hot.addEventListener("click", e => { const p = e.target.dataset && e.target.dataset.p; if (p) openPopup(p); });
 hot.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset.p) { e.preventDefault(); openPopup(e.target.dataset.p); } });
 
 /* ---------------- frame loop ---------------- */
@@ -445,7 +457,13 @@ function openPopup(name) {
   document.body.classList.add("locked"); pop.classList.add("open");
   showPage(); document.getElementById("close").focus();
 }
+let playTimer = 0;
+function stopMedia() {
+  clearTimeout(playTimer);
+  artEl.querySelectorAll("video, audio").forEach(m => { m.pause(); m.removeAttribute("src"); m.load(); });
+}
 function closePop() {
+  stopMedia();
   artEl.innerHTML = ""; z.el = null; pop.classList.remove("open"); document.body.classList.remove("locked");
   if (lastFocus && lastFocus.focus) lastFocus.focus();
 }
@@ -455,6 +473,7 @@ function showPage(langIndex = 0) {
   backBtn.hidden = !page.sub;
   chev.hidden = chevLabel.hidden = page.sub || !w.next;
   chevLabel.textContent = w.next ? w.next.label : "";
+  stopMedia();
   langsEl.innerHTML = ""; artEl.innerHTML = ""; z.el = null;
   zin.hidden = zout.hidden = p.type === "video";
   titleEl.textContent = p.heading || "";
@@ -465,7 +484,7 @@ function showPage(langIndex = 0) {
       ${p.curtains ? '<div class="curtain l"></div><div class="curtain r"></div>' : ""}</div>`;
     const th = artEl.firstChild, v = th.querySelector("video");
     requestAnimationFrame(() => requestAnimationFrame(() => th.classList.add("open")));
-    setTimeout(() => v.play().catch(() => {}), p.curtains ? 1600 : 0);
+    playTimer = setTimeout(() => { if (v.isConnected && pop.classList.contains("open")) v.play().catch(() => {}); }, p.curtains ? 1600 : 0);
     fitTop(); return;
   }
   if (p.type === "langs") {
