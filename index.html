@@ -26,6 +26,12 @@
   #gl.drag { cursor: grabbing; }
   #hot { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   #hot polygon { touch-action: pan-y; fill: rgba(255,237,204,0); stroke: rgba(255,237,204,0); stroke-width: 2px; cursor: pointer; pointer-events: all; transition: fill .15s, stroke .15s; }
+  /* breathing outline: grows from its size to 2x and back, about every 1.6 s */
+  #hot polygon.pulse { transform-box: fill-box; transform-origin: center; stroke: var(--warm); stroke-width: 2.5px; fill: rgba(255,237,204,.06);
+    vector-effect: non-scaling-stroke; animation: breathe 1.6s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(255,210,150,.9)); }
+  @keyframes breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(2); opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { #hot polygon.pulse { animation: none; } }
+  #hot polygon.pulse:hover { animation: none; }
   #hot polygon:hover, #hot polygon:focus-visible { fill: rgba(255,237,204,.10); stroke: var(--warm); outline: none; }
 
   .hud { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 76px calc(16px + env(safe-area-inset-bottom)) 24px; display: flex; align-items: center; gap: 16px; pointer-events: none; background: linear-gradient(transparent, rgba(0,0,0,.55)); }
@@ -82,7 +88,7 @@
   #label .lc { font-size: 12px; margin: 12px 0 0; line-height: 1.45; color: rgba(255,255,255,.7); }
   #label .lx { font-size: 15px; line-height: 1.55; margin: 18px 0 0; color: rgba(255,255,255,.88); }
   #label.long { align-self: stretch; overflow-y: auto; padding-right: 6px; display: flex; flex-direction: column; justify-content: safe center; }
-  #label .go-next { margin-top: 16px; color: var(--warm); border-color: var(--warm); }
+  #label .go-next { margin-top: 12px; margin-bottom: 2px; color: var(--warm); border-color: var(--warm); }
   #label .thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
   #label .thumbs button { padding: 0; border: 2px solid transparent; background: none; border-radius: 4px; cursor: pointer; }
   #label .thumbs button.on { border-color: #fff; }
@@ -207,6 +213,7 @@ Object.assign(POPUPS, {
                "Provenance: unknown owner; acquired by Harry G. Friedman for the Jewish Museum, 1950s"],
       text: "These spice containers take the form of leafy plants crowned by bulbous fruits. Filled with fragrant spices, they were used in the Havdalah ceremony (Hebrew for \u201cseparation\u201d) that marks the end of the sacred time of the Sabbath and the beginning of the new week. Havdalah, which takes place after sundown, includes the kindling of a candle, the light of which would have reflected dramatically on these intricate silver objects as they were passed from person to person to smell the spices within." },
     img: IMG_2610.SPICE_001,
+    pulse: [14, 24],      // white silver on a white deck: the outline breathes at these stops until it has been opened
     next: { label: "View in 3D", heading: "Spice container \u00b7 3D", type: "model", src: "versions/2026-10/models/spice_container_001.glb" } },
   SAINT_ANNE: { label: {
       title: "Reliquary bust of Saint Anne with the Virgin and Child, c. 1500",
@@ -237,14 +244,25 @@ const gl = canvas.getContext("webgl", { antialias: false, alpha: false });
 const VS = `attribute vec2 p; varying vec2 v; void main(){ v = p; gl_Position = vec4(p, 0., 1.); }`;
 const FS = `precision highp float;
 varying vec2 v;
-uniform sampler2D A, B; uniform float mixAB, tanH, tanV;
-uniform vec3 F, R, U, F2, R2, U2;
+uniform sampler2D A, B, H; uniform float mixAB, tanH, tanV, hMix, hTH, hTV;
+uniform vec3 F, R, U, F2, R2, U2, HF, HR, HU;
 const float PI = 3.14159265;
 vec3 look(vec2 v, vec3 f, vec3 r, vec3 u){ return normalize(f + r * v.x * tanH + u * v.y * tanV); }
 vec2 uv(vec3 d){ return vec2(atan(d.y, d.x) / (2.0 * PI) + 0.5, 0.5 - asin(clamp(d.z, -1., 1.)) / PI); }
 void main(){
   vec3 ca = texture2D(A, uv(look(v, F2, R2, U2))).rgb;
-  vec3 cb = texture2D(B, uv(look(v, F, R, U))).rgb;
+  vec3 d = look(v, F, R, U);
+  vec3 cb = texture2D(B, uv(d)).rgb;
+  if (hMix > 0.0) {                       // hero: a sharper flat render of this stop's first view
+    float x = dot(d, HF);
+    if (x > 0.01) {
+      float hu = dot(d, HR) / x / hTH, hv = dot(d, HU) / x / hTV;
+      if (abs(hu) < 1.0 && abs(hv) < 1.0) {
+        float e = min(1.0 - abs(hu), 1.0 - abs(hv));
+        cb = mix(cb, texture2D(H, vec2((hu + 1.0) * 0.5, (1.0 - hv) * 0.5)).rgb, smoothstep(0.0, 0.07, e) * hMix);
+      }
+    }
+  }
   gl_FragColor = vec4(mix(ca, cb, mixAB), 1.0);
 }`;
 function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; }
@@ -255,7 +273,9 @@ gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), g
 const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 if (gl.getParameter(gl.MAX_TEXTURE_SIZE) < 6144) PANO_DIR = "pano_m";
 const U_ = n => gl.getUniformLocation(prog, n);
-gl.uniform1i(U_("A"), 0); gl.uniform1i(U_("B"), 1);
+gl.uniform1i(U_("A"), 0); gl.uniform1i(U_("B"), 1); gl.uniform1i(U_("H"), 2);
+const blankTex = (() => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(3)); return t; })();
+const MAXTEX = gl.getParameter(gl.MAX_TEXTURE_SIZE);
 
 function makeTex(img) {
   const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -341,7 +361,7 @@ function onScroll() {
 }
 function go(i) {
   if (i === cur || !T(i)) return;
-  prevTex = T(cur); prev = cur; cur = i; fade = 0; fadeStart = performance.now();
+  dropHero(); prevTex = T(cur); prev = cur; cur = i; fade = 0; fadeStart = performance.now();
   lastStep = performance.now();
   // the old view dissolves away as it was; the new panorama appears already facing its chosen first view (no camera motion)
   prevYaw = yaw; prevPitch = pitch;
@@ -350,6 +370,32 @@ function go(i) {
   if (EDIT) updateEdit();
 }
 let lastStep = 0, prevYaw = 0, prevPitch = 0, prevTex = null;
+/* ---------------- hero first views: loaded when a stop is reached, faded in, freed when you move on ---------------- */
+const HERO_FADE_MS = 280, NOHERO = /[?&]nohero\b/.test(location.search);   // ?nohero = compare without
+let hero = { key: "", tex: null, b: null, tH: 1, tV: 1, mix: 0, t0: 0, want: "" };
+function heroInfo(i) {
+  const st = data && data.stops[i];
+  return st && st.hero && show && show.dir && i >= show.from ? st.hero : null;
+}
+function dropHero() { if (hero.tex) gl.deleteTexture(hero.tex); hero = { key: "", tex: null, b: null, tH: 1, tV: 1, mix: 0, t0: 0, want: "" }; }
+function updateHero() {
+  const h = heroInfo(cur), key = h ? show.id + ":" + cur : "";
+  if (key === hero.key || key === hero.want) return;
+  dropHero();
+  if (!h) return;
+  hero.want = key;
+  // pick the file that matches this screen: full (≈40 px/deg) for sharp screens, light (≈30 px/deg) otherwise
+  const needPxPerDeg = (innerWidth >= innerHeight ? canvas.width : canvas.height) / fov;   // fov applies to the wider screen side
+  const big = MAXTEX >= 4096 && needPxPerDeg > 20;            // full hero is ~30 px/deg; the light one ~22
+  const im = new Image();
+  im.onload = () => {
+    if (hero.want !== key) return;                 // the visitor has already moved on
+    hero.tex = makeTex(im); hero.key = key; hero.want = "";
+    hero.b = basis(h.yaw, h.pitch); hero.tH = Math.tan(h.hfov * Math.PI / 360); hero.tV = Math.tan(h.vfov * Math.PI / 360);
+    hero.t0 = performance.now(); hero.mix = 0;
+  };
+  im.src = `${show.dir}${big ? "hero" : "hero_m"}/p${String(cur).padStart(3, "0")}.webp`;
+}
 
 /* ---------------- look around: drag ---------------- */
 let dragging = null;
@@ -449,6 +495,7 @@ function hull(ps) {
   return lo.slice(0, -1).concat(up.slice(0, -1));
 }
 let hotKey = "", hotShapes = [];
+const opened = new Set();            // works already opened: their outline stops breathing
 function drawHot(b, tH, tV) {
   if (fade < 1 || scrollY < CRAWL_PX * 0.9 || scrollY > endStart() + END_PX * 0.15) { hotShapes = []; if (hotKey) { hot.innerHTML = ""; hotKey = ""; } return; }
   const spots = data.stops[cur].spots.filter(s => POPUPS[s.popup]);
@@ -457,10 +504,13 @@ function drawHot(b, tH, tV) {
     const pts = clipProject(s.dirs, b, tH, tV);
     if (pts.length < 3) continue;
     const h = hull(pts); hotShapes.push({ p: s.popup, h });
-    const title = nameOf(POPUPS[s.popup]).replace(/"/g, "&quot;");
-    html += `<polygon tabindex="0" role="button" aria-label="${title}" data-p="${s.popup}" points="${h.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ")}"/>`;
+    const title = nameOf(POPUPS[s.popup]).replace(/"/g, "&quot;"), W = POPUPS[s.popup];
+    const pulse = W.pulse && !opened.has(s.popup) && cur >= W.pulse[0] && cur <= W.pulse[1];
+    // the outline is redrawn as the view moves; a negative delay keeps the breathing continuous instead of restarting
+    const pa = pulse ? ` class="pulse" style="animation-delay:-%D%s"` : "";
+    html += `<polygon${pa} tabindex="0" role="button" aria-label="${title}" data-p="${s.popup}" points="${h.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ")}"/>`;
   }
-  if (html !== hotKey) { hot.innerHTML = html; hotKey = html; }
+  if (html !== hotKey) { hot.innerHTML = html.split("%D%").join(((performance.now() % 1600) / 1000).toFixed(2)); hotKey = html; }
 }
 hot.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset.p) { e.preventDefault(); openPopup(e.target.dataset.p); } });
 
@@ -481,6 +531,17 @@ function frame(now) {
   const b2 = fade < 1 ? basis(prevYaw, prevPitch) : b;
   gl.uniform3fv(U_("F2"), b2.F); gl.uniform3fv(U_("R2"), b2.R); gl.uniform3fv(U_("U2"), b2.U);
   gl.uniform1f(U_("mixAB"), fade < 1 ? e : 1);
+  if (fade >= 1 && !NOHERO) updateHero();
+  if (hero.tex && hero.key === show.id + ":" + cur && fade >= 1) {
+    hero.mix = Math.min(1, (now - hero.t0) / HERO_FADE_MS);
+    gl.uniform3fv(U_("HF"), hero.b.F); gl.uniform3fv(U_("HR"), hero.b.R); gl.uniform3fv(U_("HU"), hero.b.U);
+    gl.uniform1f(U_("hTH"), hero.tH); gl.uniform1f(U_("hTV"), hero.tV);
+    gl.uniform1f(U_("hMix"), hero.mix * hero.mix * (3 - 2 * hero.mix));
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, hero.tex);
+  } else {
+    gl.uniform1f(U_("hMix"), 0);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, blankTex);
+  }
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, fade < 1 ? (prevTex || T(cur)) : T(cur));
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, T(cur));
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -503,7 +564,7 @@ function switchShow(id) {
   if (!sh || sh === show) return;
   getStops(sh).then(d => {
     const keepYaw = yaw, keepPitch = pitch, oldTex = T(cur);
-    show = sh; data = d; buildShowTabs();
+    dropHero(); show = sh; data = d; buildShowTabs();
     try { history.replaceState(null, "", "#" + sh.id); } catch (_) {}
     hotKey = ""; hot.innerHTML = "";
     for (let k = -2; k <= 4; k++) load(target + k);
@@ -577,7 +638,7 @@ const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 function openPopup(name) {
   if (!POPUPS[name] || pop.classList.contains("open")) return;
   lastFocus = document.activeElement;
-  page = { work: POPUPS[name], sub: false }; popOpenedAt = performance.now();
+  page = { work: POPUPS[name], sub: false }; popOpenedAt = performance.now(); opened.add(name);
   document.body.classList.add("locked"); pop.classList.add("open");
   showPage(); document.getElementById("close").focus();
 }
@@ -641,8 +702,8 @@ function showPage(langIndex = 0) {
       labelEl.classList.add("long");
       labelEl.innerHTML = `<p class="lt">${esc(L.title)}</p>` + (L.place ? `<p class="lm">${esc(L.place)}</p>` : "") +
         (L.medium ? `<p class="lm">${esc(L.medium)}</p>` : "") +
-        (L.credit ? `<p class="lc">${L.credit.map(esc).join("<br>")}</p>` : "") +
         (w.next ? `<p><button class="btn go-next" type="button">${esc(w.next.label)} &rsaquo;</button></p>` : "") +
+        (L.credit ? `<p class="lc">${L.credit.map(esc).join("<br>")}</p>` : "") +
         (L.text ? `<p class="lx">${esc(L.text)}</p>` : "");
       const gn = labelEl.querySelector(".go-next"); if (gn) gn.onclick = () => { page.sub = true; showPage(); };
     } else
