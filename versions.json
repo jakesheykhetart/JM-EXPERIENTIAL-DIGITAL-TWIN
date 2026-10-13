@@ -13,7 +13,8 @@
       "title": "The current installation",
       "dir": "versions/2026-10/",
       "from": 5,
-      "stops": "versions/2026-10/stops.json"
+      "stops": "versions/2026-10/stops.json",
+      "dolly": "versions/2026-10/dolly.json"
     }
   ]
 }

@@ -234,6 +234,11 @@ const MOBILE = Math.min(screen.width, screen.height) < 700 || innerWidth < 700;
 let PANO_DIR = MOBILE ? "pano_m" : "pano";
 const PX_PER_STOP = MOBILE ? 227 : 280;           // scroll distance per step (larger = slower)
 const STEP_MS = 400;                               // at most one step this often, however fast the scroll
+/* Dolly: where a show has in-between stills (dolly.json), scrolling moves continuously through them instead of
+   jumping a whole stop. Much more scroll per stop there, so each scroll moves you a shorter distance. */
+const DOLLY_PX = MOBILE ? 1500 : 1100;            // scroll distance per stop on dolly stretches (larger = less travel per scroll)
+const IDLE_MS = MOBILE ? 260 : 450;               // scrolling has stopped this long: glide on to the next panorama
+const STILL_DIR = MOBILE ? "dolly_m" : "dolly";
 const CRAWL_PX = MOBILE ? 2000 : 2600;
 const END_PX = MOBILE ? 1600 : 2000;              // scroll distance used by the closing crawl           // scroll distance used by the opening crawl
 const EDIT = /[?&]edit\b/.test(location.search);
@@ -244,15 +249,23 @@ const gl = canvas.getContext("webgl", { antialias: false, alpha: false });
 const VS = `attribute vec2 p; varying vec2 v; void main(){ v = p; gl_Position = vec4(p, 0., 1.); }`;
 const FS = `precision highp float;
 varying vec2 v;
-uniform sampler2D A, B, H; uniform float mixAB, tanH, tanV, hMix, hTH, hTV;
-uniform vec3 F, R, U, F2, R2, U2, HF, HR, HU;
+uniform sampler2D A, B, H, P; uniform float mixAB, tanH, tanV, hMix, hTH, hTV, flA, flB;
+uniform vec3 F, R, U, F2, R2, U2, HF, HR, HU, AF, AR, AU, BF, BR, BU;
 const float PI = 3.14159265;
 vec3 look(vec2 v, vec3 f, vec3 r, vec3 u){ return normalize(f + r * v.x * tanH + u * v.y * tanV); }
 vec2 uv(vec3 d){ return vec2(atan(d.y, d.x) / (2.0 * PI) + 0.5, 0.5 - asin(clamp(d.z, -1., 1.)) / PI); }
+// a flat 90x90 deg still; outside its frame (only while the view swings back to the walking direction) the panorama shows
+vec3 still(sampler2D S, vec3 d, vec3 f, vec3 r, vec3 u, vec3 fb){
+  float x = dot(d, f);
+  if (x > 0.01) { float a = dot(d, r) / x, b = dot(d, u) / x;
+    if (abs(a) < 0.998 && abs(b) < 0.998) return texture2D(S, vec2((a + 1.0) * 0.5, (1.0 - b) * 0.5)).rgb; }
+  return fb;
+}
 void main(){
-  vec3 ca = texture2D(A, uv(look(v, F2, R2, U2))).rgb;
   vec3 d = look(v, F, R, U);
-  vec3 cb = texture2D(B, uv(d)).rgb;
+  vec3 fb = (flA > 0.5 || flB > 0.5) ? texture2D(P, uv(d)).rgb : vec3(0.0);
+  vec3 ca = flA > 0.5 ? still(A, d, AF, AR, AU, fb) : texture2D(A, uv(look(v, F2, R2, U2))).rgb;
+  vec3 cb = flB > 0.5 ? still(B, d, BF, BR, BU, fb) : texture2D(B, uv(d)).rgb;
   if (hMix > 0.0) {                       // hero: a sharper flat render of this stop's first view
     float x = dot(d, HF);
     if (x > 0.01) {
@@ -273,7 +286,7 @@ gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), g
 const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 if (gl.getParameter(gl.MAX_TEXTURE_SIZE) < 6144) PANO_DIR = "pano_m";
 const U_ = n => gl.getUniformLocation(prog, n);
-gl.uniform1i(U_("A"), 0); gl.uniform1i(U_("B"), 1); gl.uniform1i(U_("H"), 2);
+gl.uniform1i(U_("A"), 0); gl.uniform1i(U_("B"), 1); gl.uniform1i(U_("H"), 2); gl.uniform1i(U_("P"), 3);
 const blankTex = (() => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(3)); return t; })();
 const MAXTEX = gl.getParameter(gl.MAX_TEXTURE_SIZE);
 
@@ -327,15 +340,32 @@ function updateLoading() {
   el.textContent = T(target) ? "" : "Loading…";
 }
 
-/* ---------------- movement: scroll picks the stop ---------------- */
+/* ---------------- movement: scroll picks the position ---------------- */
 const track = document.getElementById("track");
-let target = 0;
-function stopFromScroll() {
-  return Math.max(0, Math.min(N - 1, Math.round((scrollY - CRAWL_PX) / PX_PER_STOP)));
+let target = 0;                       // nearest stop to where the scroll points (loading, progress)
+let goal = 0;                         // where the scroll points, in stops (fractional on dolly stretches)
+let stopPx = [];                      // scroll position of each stop
+const hasDolly = g => !!(data && data.dolly && data.dolly.gaps[g]);
+const gapPx = g => hasDolly(g) ? DOLLY_PX : PX_PER_STOP;
+function layout() {
+  stopPx = [CRAWL_PX];
+  for (let i = 0; i < N - 1; i++) stopPx.push(stopPx[i] + gapPx(i));
+  track.style.height = `calc(100vh + ${endStart() + END_PX + 40}px)`;
 }
+function posFromScroll(y) {
+  if (y <= stopPx[0]) return 0;
+  for (let i = 0; i < N - 1; i++) {
+    if (y < stopPx[i + 1]) {
+      const f = (y - stopPx[i]) / gapPx(i);
+      return hasDolly(i) ? i + f : i + (f >= 0.5 ? 1 : 0);    // no stills: whole stops, as before
+    }
+  }
+  return N - 1;
+}
+const scrollForPos = p => { const i = Math.min(N - 2, Math.floor(p)); return N < 2 ? stopPx[0] : stopPx[i] + (p - i) * gapPx(i); };
 const crawlText = document.getElementById("crawlText"), crawlShade = document.getElementById("crawlShade"), crawlCue = document.getElementById("crawlCue");
 const endText = document.getElementById("endText"), endShade = document.getElementById("endShade");
-function endStart() { return CRAWL_PX + (N - 1) * PX_PER_STOP + PX_PER_STOP * 0.6; }
+function endStart() { return (stopPx.length ? stopPx[N - 1] : CRAWL_PX + (N - 1) * PX_PER_STOP) + PX_PER_STOP * 0.6; }
 function updateCrawl() {
   if (N) {
     // closing crawl: rises from the bottom after the last stop and settles on screen; scrolling back sends it down
@@ -352,13 +382,22 @@ function updateCrawl() {
   crawlShade.style.opacity = 1 - fadeOut;
   crawlCue.style.opacity = scrollY < 12 ? 1 : 0;       // disappears the moment the visitor starts scrolling
 }
+let lastScrollT = 0, scrollDir = 1, progY = null, snapping = false, touching = false;
 function onScroll() {
   updateCrawl();
-  target = stopFromScroll();
-  document.getElementById("prog").style.width = (100 * target / Math.max(1, N - 1)) + "%";
+  if (!N) return;
+  if (progY !== null && Math.abs(scrollY - progY) < 2) return;     // our own re-alignment after a glide: not a visitor scroll
+  progY = null;
+  const g = posFromScroll(scrollY);
+  if (g !== goal) scrollDir = Math.sign(g - goal) || scrollDir;
+  goal = g; snapping = false; lastScrollT = performance.now();
+  target = Math.round(goal);
   for (let k = -2; k <= 4; k++) load(target + k);
   updateLoading();
 }
+addEventListener("touchstart", () => { touching = true; }, { passive: true });
+addEventListener("touchend", e => { if (!e.touches.length) { touching = false; lastScrollT = performance.now(); } }, { passive: true });
+addEventListener("touchcancel", () => { touching = false; }, { passive: true });
 function go(i) {
   if (i === cur || !T(i)) return;
   dropHero(); prevTex = T(cur); prev = cur; cur = i; fade = 0; fadeStart = performance.now();
@@ -370,6 +409,111 @@ function go(i) {
   if (EDIT) updateEdit();
 }
 let lastStep = 0, prevYaw = 0, prevPitch = 0, prevTex = null;
+
+/* ---------------- dolly: continuous walk through flat in-between stills ---------------- */
+let moving = false, pos = 0, look = 0, lookP = 0, lastNow = 0;
+const stillTex = new Map(), stillLoading = new Set();
+const SUB = () => data.dolly.sub;
+const wrap = a => ((a + 540) % 360) - 180;
+const viewYaw = i => (data.stops[i].view || { yaw: data.stops[i].heading }).yaw;
+function frameYaw(g, k) { return k <= 0 ? viewYaw(g) : k >= SUB() ? viewYaw(g + 1) : data.dolly.gaps[g][k - 1]; }
+function dollyYaw(p) {
+  const g = Math.min(N - 2, Math.floor(p)), x = (p - g) * SUB(), k = Math.floor(x), w = x - k;
+  const a = frameYaw(g, k); return a + wrap(frameYaw(g, k + 1) - a) * w;
+}
+const stillKey = (g, k) => show.id + ":" + g + ":" + k;
+function stillUrl(g, k) { return `${show.dir}${STILL_DIR}/g${String(g).padStart(3, "0")}_${String(k).padStart(2, "0")}.webp`; }
+// the image at sub-frame k of gap g: the panoramas at the ends, stills in between
+function imgAt(g, k) { return k <= 0 ? { t: T(g), flat: false } : k >= SUB() ? { t: T(g + 1), flat: false } : { t: stillTex.get(stillKey(g, k)), flat: true, yaw: frameYaw(g, k) }; }
+function loadStill(g, k) {
+  const key = stillKey(g, k);
+  if (stillTex.has(key) || stillLoading.has(key)) return;
+  stillLoading.add(key);
+  const im = new Image(), sid = show.id;
+  im.onload = () => { stillLoading.delete(key); if (show.id === sid) stillTex.set(key, makeTex(im)); };
+  im.onerror = () => stillLoading.delete(key);
+  im.src = stillUrl(g, k);
+}
+// fetch the nearest stills first (ahead of the walking direction), a few at a time; free the far ones
+let lastWant = 0;
+function wantStills(now) {
+  if (!data || !data.dolly || now - lastWant < 90) return;
+  lastWant = now;
+  const at = moving ? pos : cur, dir = moving ? Math.sign(goal - pos) || scrollDir : scrollDir, n = SUB();
+  const list = [];
+  for (let g = Math.floor(at) - 2; g <= Math.floor(at) + 2; g++) {
+    if (!hasDolly(g)) continue;
+    for (let k = 1; k < n; k++) {
+      const d = (g + k / n) - at, cost = Math.abs(d) * (Math.sign(d) === dir ? 1 : 2.5);
+      if (cost <= (moving ? 2.2 : 1.1)) list.push([cost, g, k]);
+    }
+  }
+  list.sort((a, b) => a[0] - b[0]);
+  // the panoramas the walk passes through come first
+  const f0 = Math.floor(at);
+  for (const i of dir > 0 ? [f0, f0 + 1, f0 + 2] : [f0 + 1, f0, f0 - 1]) load(i);
+  for (const [, g, k] of list) { if (stillLoading.size >= 6) break; loadStill(g, k); }
+  for (const [key, t] of stillTex) {
+    const g = +key.split(":")[1];
+    if (key.split(":")[0] !== show.id || g < Math.floor(at) - 2 || g > Math.floor(at) + 2) { gl.deleteTexture(t); stillTex.delete(key); }
+  }
+}
+function framesReady(p) {
+  const g = Math.min(N - 2, Math.floor(p)), x = (p - g) * SUB(), k = Math.floor(x + 1e-6);
+  return !!imgAt(g, k).t && (x - k < 1e-6 || !!imgAt(g, k + 1).t);
+}
+function startDolly() {
+  dropHero(); moving = true; pos = cur; fade = 1;
+  look = wrap(yaw - viewYaw(cur)); lookP = pitch;       // where the visitor was looking eases back to the walking direction
+}
+function arrive(i) {
+  moving = false; snapping = false; cur = i; pos = i; prev = i; prevTex = null; fade = 1;
+  yaw = viewYaw(i) + look; pitch = lookP; look = 0; lookP = 0;
+  lastStep = performance.now(); updateLoading();
+  if (EDIT) updateEdit();
+}
+function stepDolly(now, dt) {
+  // a visitor who has stopped scrolling between stills glides on (in the direction they were going) to the next panorama
+  if (!touching && progY === null && now - lastScrollT > IDLE_MS && !snapping) {
+    const fl = Math.floor(goal);
+    if (goal !== fl && hasDolly(fl)) {
+      // only grazed the stretch (an accidental nudge): settle back; otherwise carry on to the next panorama
+      const f = scrollDir > 0 ? goal - fl : Math.ceil(goal) - goal;
+      const to = (scrollDir > 0) === (f >= 0.05) ? Math.ceil(goal) : fl;
+      snapping = true; goal = to; target = to;
+      progY = Math.round(scrollForPos(to)); scrollTo(0, progY);
+    }
+  }
+  // a big jump (scroll bar dragged, a hard fling): dissolve straight there instead of walking the whole way
+  if (Math.abs(goal - (moving ? pos : cur)) > 3.5) {
+    const want = Math.max(0, Math.min(N - 1, Math.round(goal)));
+    if (moving) arrive(Math.round(pos));
+    if (!T(want)) load(want); else if (fade >= 1 && want !== cur) go(want);
+    return;
+  }
+  if (!moving) {
+    if (goal === cur) return;
+    const dir = Math.sign(goal - cur);
+    if (hasDolly(dir > 0 ? cur : cur - 1)) { if (fade < 1) return; startDolly(); }
+    else {                                                    // no stills here: one dissolve step at a time, as before
+      const want = dir > 0 ? Math.min(Math.ceil(goal), cur + 1) : Math.max(Math.floor(goal), cur - 1);
+      if (fade >= 1 && now - lastStep > STEP_MS) { if (T(want)) go(want); else load(want); }
+      return;
+    }
+  }
+  // never run on into a stretch without stills: stop at its stop and let the dissolve take over
+  let to = goal;
+  if (to > pos) { let s = Math.floor(pos); while (s < to && hasDolly(s)) s++; to = Math.min(to, s); }
+  else if (to < pos) { let s = Math.ceil(pos); while (s > to && hasDolly(s - 1)) s--; to = Math.max(to, s); }
+  const TAU = snapping ? 0.2 : 0.11, VMAX = snapping ? 1.15 : 2.6, VMIN = snapping ? 0.32 : 0.05;   // stops per second
+  let st = (to - pos) * (1 - Math.exp(-dt / TAU));
+  const mag = Math.min(Math.abs(to - pos), Math.max(VMIN * dt, Math.min(VMAX * dt, Math.abs(st))));
+  let np = Math.abs(to - pos) < 0.002 ? to : pos + Math.sign(to - pos) * mag;
+  if (framesReady(np)) pos = np;                             // the next frames are not here yet: wait for them
+  document.getElementById("loading").textContent = framesReady(np) ? "" : "Loading…";
+  if (!dragging) { const kk = Math.exp(-dt / 0.35); look *= kk; lookP *= kk; }
+  if (pos === to && to === Math.round(to) && (to === goal || !hasDolly(Math.sign(goal - to) > 0 ? to : to - 1))) arrive(to);
+}
 /* ---------------- hero first views: loaded when a stop is reached, faded in, freed when you move on ---------------- */
 const HERO_FADE_MS = 280, NOHERO = /[?&]nohero\b/.test(location.search);   // ?nohero = compare without
 let hero = { key: "", tex: null, b: null, tH: 1, tV: 1, mix: 0, t0: 0, want: "" };
@@ -414,6 +558,7 @@ canvas.addEventListener("pointermove", e => {
   const dx = e.clientX - dragging.x, dy = e.clientY - dragging.y;
   dragging.x = e.clientX; dragging.y = e.clientY; dragging.moved += Math.abs(dx) + Math.abs(dy);
   const k = 0.8 * fov / innerWidth;                 // degrees per pixel (a little slower than the finger)
+  if (moving) { look -= dx * k; if (e.pointerType === "mouse") lookP = Math.max(-80, Math.min(80, lookP + dy * k)); return; }
   yaw -= dx * k;                                    // drag the scene (Street View style)
   if (e.pointerType === "mouse") pitch = Math.max(-80, Math.min(80, pitch + dy * k));
 });
@@ -497,7 +642,7 @@ function hull(ps) {
 let hotKey = "", hotShapes = [];
 const opened = new Set();            // works already opened: their outline stops breathing
 function drawHot(b, tH, tV) {
-  if (fade < 1 || scrollY < CRAWL_PX * 0.9 || scrollY > endStart() + END_PX * 0.15) { hotShapes = []; if (hotKey) { hot.innerHTML = ""; hotKey = ""; } return; }
+  if (moving || fade < 1 || scrollY < CRAWL_PX * 0.9 || scrollY > endStart() + END_PX * 0.15) { hotShapes = []; if (hotKey) { hot.innerHTML = ""; hotKey = ""; } return; }
   const spots = data.stops[cur].spots.filter(s => POPUPS[s.popup]);
   let html = ""; hotShapes = [];
   for (const s of spots) {
@@ -518,12 +663,36 @@ hot.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") 
 function frame(now) {
   requestAnimationFrame(frame);
   if (!N || !T(cur)) return;
+  const dt = Math.min(0.05, Math.max(0, (now - (lastNow || now)) / 1000)); lastNow = now;
   if (fade < 1) fade = Math.min(1, (now - fadeStart) / FADE_MS);
-  // one step at a time toward where the scroll points
-  if (target !== cur && fade >= 1 && now - lastStep > STEP_MS) {
-    const nxt = cur + Math.sign(target - cur);
-    if (T(nxt)) go(nxt); else load(nxt);
+  if (data.dolly) wantStills(now);
+  stepDolly(now, dt);
+  document.getElementById("prog").style.width = (100 * (moving ? pos : cur) / Math.max(1, N - 1)) + "%";
+  if (moving) {
+    // walking: two neighbouring frames, blended by how far between them we are
+    yaw = dollyYaw(pos) + look; pitch = lookP;
+    const b = basis(yaw, pitch), [tH, tV] = tans();
+    const g = Math.min(N - 2, Math.floor(pos)), x = (pos - g) * SUB(), k = Math.floor(x + 1e-6), w = Math.max(0, x - k);
+    const L0 = imgAt(g, k), L1 = w > 1e-4 ? imgAt(g, k + 1) : L0;
+    gl.uniform3fv(U_("F"), b.F); gl.uniform3fv(U_("R"), b.R); gl.uniform3fv(U_("U"), b.U);
+    gl.uniform3fv(U_("F2"), b.F); gl.uniform3fv(U_("R2"), b.R); gl.uniform3fv(U_("U2"), b.U);
+    gl.uniform1f(U_("tanH"), tH); gl.uniform1f(U_("tanV"), tV);
+    for (const [L, n] of [[L0, "A"], [L1, "B"]]) {
+      gl.uniform1f(U_("fl" + n), L.flat ? 1 : 0);
+      if (L.flat) { const sb = basis(L.yaw, 0); gl.uniform3fv(U_(n + "F"), sb.F); gl.uniform3fv(U_(n + "R"), sb.R); gl.uniform3fv(U_(n + "U"), sb.U); }
+    }
+    // mostly one sharp frame; a short dissolve around each hand-over (a long blend would double near objects)
+    gl.uniform1f(U_("mixAB"), w > 1e-4 ? Math.min(1, Math.max(0, (w - 0.3) / 0.4)) : 0);
+    gl.uniform1f(U_("hMix"), 0);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, blankTex);
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, T(Math.round(pos)) || T(g) || T(g + 1) || blankTex);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, L0.t || blankTex);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, L1.t || L0.t || blankTex);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    drawHot(b, tH, tV);
+    return;
   }
+  gl.uniform1f(U_("flA"), 0); gl.uniform1f(U_("flB"), 0);
   const e = fade * fade * (3 - 2 * fade);
   const b = basis(yaw, pitch), [tH, tV] = tans();
   gl.uniform3fv(U_("F"), b.F); gl.uniform3fv(U_("R"), b.R); gl.uniform3fv(U_("U"), b.U);
@@ -542,6 +711,7 @@ function frame(now) {
     gl.uniform1f(U_("hMix"), 0);
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, blankTex);
   }
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, blankTex);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, fade < 1 ? (prevTex || T(cur)) : T(cur));
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, T(cur));
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -550,7 +720,10 @@ function frame(now) {
 
 function getStops(sh) {
   if (showData[sh.id]) return Promise.resolve(showData[sh.id]);
-  return fetch(sh.stops || "stops.json").then(r => r.json()).then(d => (showData[sh.id] = d));
+  return fetch(sh.stops || "stops.json").then(r => r.json()).then(d => {
+    if (!sh.dolly) return (showData[sh.id] = d);
+    return fetch(sh.dolly).then(r => r.ok ? r.json() : null).catch(() => null).then(dl => { d.dolly = dl; return (showData[sh.id] = d); });
+  });
 }
 function buildShowTabs() {
   const box = document.getElementById("shows");
@@ -563,8 +736,11 @@ function switchShow(id) {
   const sh = SHOWS.find(x => x.id === id);
   if (!sh || sh === show) return;
   getStops(sh).then(d => {
+    if (moving) arrive(Math.round(pos));
     const keepYaw = yaw, keepPitch = pitch, oldTex = T(cur);
     dropHero(); show = sh; data = d; buildShowTabs();
+    for (const t of stillTex.values()) gl.deleteTexture(t); stillTex.clear();
+    if (scrollY >= CRAWL_PX) { layout(); goal = target = cur; progY = Math.round(stopPx[cur]); scrollTo(0, progY); } else layout();
     try { history.replaceState(null, "", "#" + sh.id); } catch (_) {}
     hotKey = ""; hot.innerHTML = "";
     for (let k = -2; k <= 4; k++) load(target + k);
@@ -584,10 +760,9 @@ fetch("versions.json").then(r => r.ok ? r.json() : null).catch(() => null).then(
   return getStops(show);
 }).then(d => {
   data = d; N = d.stops.length;
-  track.style.height = `calc(100vh + ${(N - 1) * PX_PER_STOP}px)`;
+  layout();
   const v0 = d.stops[0].view || { yaw: d.stops[0].heading, pitch: 0 };
   yaw = v0.yaw; pitch = v0.pitch;
-  track.style.height = `calc(100vh + ${endStart() + END_PX + 40}px)`;
   updateCrawl();
   if (EDIT) setupEdit();
   resize(); addEventListener("resize", resize);
@@ -606,7 +781,7 @@ function setupEdit() {
     <button class="btn" id="eSet">Set as first view</button>
     <button class="btn" id="eCopy">Copy all views</button>`;
   document.getElementById("stage").appendChild(editEl);
-  const jump = k => scrollTo(0, CRAWL_PX + Math.max(0, Math.min(N - 1, cur + k)) * PX_PER_STOP);
+  const jump = k => scrollTo(0, stopPx[Math.max(0, Math.min(N - 1, cur + k))]);
   editEl.querySelector("#ePrev").onclick = () => jump(-1);
   editEl.querySelector("#eNext").onclick = () => jump(1);
   editEl.querySelector("#eSet").onclick = () => { data.stops[cur].view = { yaw: +(((yaw + 540) % 360) - 180).toFixed(1), pitch: +pitch.toFixed(1), set: true }; updateEdit(); };
