@@ -20,25 +20,52 @@
   html, body { margin: 0; background: #0b0b0b; color: var(--ink); font-family: var(--font); }
   body.locked { overflow: hidden; }
 
+  html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
   #track { position: relative; }
-  #stage { position: sticky; top: 0; height: 100vh; height: 100svh; width: 100%; overflow: hidden; background: #0b0b0b; }
-  #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: pan-y; }
+  #stage { position: fixed; inset: 0; touch-action: none; -webkit-user-select: none; user-select: none; top: 0; height: 100vh; height: 100svh; width: 100%; overflow: hidden; background: #0b0b0b; }
+  #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
   #gl.drag { cursor: grabbing; }
   #hot { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-  #hot polygon { touch-action: pan-y; fill: rgba(255,237,204,0); stroke: rgba(255,237,204,0); stroke-width: 2px; cursor: pointer; pointer-events: all; transition: fill .15s, stroke .15s; }
+  #hot polygon { touch-action: none; fill: rgba(255,237,204,0); stroke: rgba(255,237,204,0); stroke-width: 2px; cursor: pointer; pointer-events: all; transition: fill .15s, stroke .15s; }
   /* breathing outline: grows from its size to 2x and back, about every 1.6 s */
   #hot polygon.pulse { transform-box: fill-box; transform-origin: center; stroke: var(--warm); stroke-width: 2.5px; fill: rgba(255,237,204,.06);
     vector-effect: non-scaling-stroke; animation: breathe 1.6s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(255,210,150,.9)); }
   @keyframes breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(2); opacity: .35; } }
   @media (prefers-reduced-motion: reduce) { #hot polygon.pulse { animation: none; } }
   #hot polygon.pulse:hover { animation: none; }
+  #hot .badge { cursor: pointer; pointer-events: all; touch-action: none; }
+  #hot .badge circle { fill: rgba(255,237,204,.94); stroke: rgba(40,28,12,.35); stroke-width: 1px; filter: drop-shadow(0 1px 4px rgba(0,0,0,.55)); transition: transform .15s; }
+  #hot .badge path { stroke: #2a1d0c; stroke-width: 2.4px; stroke-linecap: round; fill: none; }
+  @media (hover: hover) { #hot .badge:hover circle { fill: #fff6e6; } }
   #hot polygon:hover, #hot polygon:focus-visible { fill: rgba(255,237,204,.10); stroke: var(--warm); outline: none; }
 
   .hud { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 76px calc(16px + env(safe-area-inset-bottom)) 24px; display: flex; align-items: center; gap: 16px; pointer-events: none; background: linear-gradient(transparent, rgba(0,0,0,.55)); }
+  .hud .count { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--warm); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  /* floor plan: the set path, how far along you are, which way you are looking */
+  #mapBtn { position: absolute; top: 14px; left: 14px; z-index: 19; width: 168px; padding: 6px 6px 4px; border-radius: 10px; background: rgba(12,11,10,.86); border: 1px solid rgba(255,237,204,.25);
+    cursor: pointer; transition: width .35s, opacity .4s; display: flex; flex-direction: column; gap: 2px; opacity: 0; pointer-events: none; }
+  #mapBtn.show { opacity: 1; pointer-events: auto; }
+  #mapBtn svg { width: 100%; height: auto; display: block; }
+  #mapBtn .cap { font: 700 10px/1.3 var(--font); letter-spacing: .16em; text-transform: uppercase; color: var(--warm); text-align: left; padding: 2px 2px 0; }
+  #mapBtn.big { z-index: 30; width: min(560px, 90vw); top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 100vmax rgba(0,0,0,.55); background: rgba(12,11,10,.94); }
+  #mapBtn .x { display: none; position: absolute; top: 8px; right: 10px; font: 400 26px/1 var(--font); color: var(--warm); }
+  #mapBtn.big .x { display: block; }
+  #mapBtn.big .cap { font-size: 12px; letter-spacing: .1em; text-transform: none; font-weight: 400; color: #fff; line-height: 1.45; padding: 6px 4px 4px; }
+  #routeAll { fill: none; stroke: rgba(255,190,110,.45); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 2 9; }
+  #routeDone { fill: none; stroke: #ffbe6e; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+  #here { fill: #fff6e6; stroke: #2a1d0c; stroke-width: 2; }
+  #cone { fill: rgba(255,237,204,.35); }
+  @media (max-width: 700px) { #mapBtn { width: 116px; top: 10px; left: 10px; } }
+  #nudge { position: absolute; left: 50%; bottom: calc(64px + env(safe-area-inset-bottom)); transform: translate(-50%, 8px); z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 10px 18px 8px; border-radius: 12px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,237,204,.3); color: var(--warm); pointer-events: none; opacity: 0; transition: opacity .5s, transform .5s; }
+  #nudge.on { opacity: 1; transform: translate(-50%, 0); }
+  #nudge span { font-size: 13px; letter-spacing: .16em; text-transform: uppercase; white-space: nowrap; }
+  #nudge b { font-size: 26px; line-height: 1; animation: bob 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { #nudge b { animation: none; } }
   .hud .label { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--warm); white-space: nowrap; }
   .hud .bar { flex: 1; height: 2px; background: rgba(255,255,255,.2); position: relative; }
   .hud .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--warm); transition: width .3s; }
-  #loading { position: absolute; top: 18px; left: 24px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.6); }
+  #loading { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.6); }
 
   /* opening crawl: scroll drives it up, scrolling back sends it down again */
   #crawl, #endCrawl { position: absolute; inset: 0; z-index: 5; overflow: hidden; pointer-events: none; perspective: 360px; perspective-origin: 50% 20%; }
@@ -151,7 +178,10 @@
     </button>
     <div id="shows" role="tablist" aria-label="Installation"></div>
     <div id="crawlCue"><span>Scroll to begin</span><b>&darr;</b></div>
-    <div class="hud"><span class="label">Drag to look · scroll to walk</span><span class="bar"><i id="prog"></i></span></div>
+    <div class="hud"><span class="label" id="hudLabel">Drag to look · scroll to walk</span><span class="bar"><i id="prog"></i></span><span class="count" id="count"></span></div>
+    <button id="mapBtn" aria-expanded="false" aria-label="Floor plan of your route"><svg id="map" aria-hidden="true"><image id="mapImg"/><polyline id="routeAll"/><polyline id="routeDone"/><path id="cone"/><circle id="here" r="7"/></svg>
+      <span class="cap" id="mapCap">Your route</span><span class="x" aria-hidden="true">&times;</span></button>
+    <div id="nudge" aria-live="polite"><span id="nudgeText">Scroll to continue</span><b id="nudgeArrow">&darr;</b></div>
   </div>
 </div>
 
@@ -237,7 +267,6 @@ const STEP_MS = 400;                               // at most one step this ofte
 /* Dolly: where a show has in-between stills (dolly.json), scrolling moves continuously through them instead of
    jumping a whole stop. Much more scroll per stop there, so each scroll moves you a shorter distance. */
 const DOLLY_PX = MOBILE ? 1500 : 1100;            // scroll distance per stop on dolly stretches (larger = less travel per scroll)
-const IDLE_MS = MOBILE ? 260 : 450;               // scrolling has stopped this long: glide on to the next panorama
 const STILL_DIR = MOBILE ? "dolly_m" : "dolly";
 const CRAWL_PX = MOBILE ? 2000 : 2600;
 const END_PX = MOBILE ? 1600 : 2000;              // scroll distance used by the closing crawl           // scroll distance used by the opening crawl
@@ -340,18 +369,20 @@ function updateLoading() {
   el.textContent = T(target) ? "" : "Loading…";
 }
 
-/* ---------------- movement: scroll picks the position ---------------- */
-const track = document.getElementById("track");
-let target = 0;                       // nearest stop to where the scroll points (loading, progress)
-let goal = 0;                         // where the scroll points, in stops (fractional on dolly stretches)
-let stopPx = [];                      // scroll position of each stop
+/* ---------------- movement: a virtual scroll position (SY) the tour drives itself ----------------
+   The page itself never scrolls. Wheel, touch and keys move SY; the tour decides how motion continues after the
+   input stops, so a walk always coasts in one smooth motion onto a panorama (never stopping between). */
+let target = 0;                       // nearest stop (loading, progress)
+let goal = 0;                         // where SY points, in stops (fractional on dolly stretches)
+let stopPx = [];                      // SY of each stop
+let SY = 0;                           // the virtual scroll position, px
 const hasDolly = g => !!(data && data.dolly && data.dolly.gaps[g]);
 const gapPx = g => hasDolly(g) ? DOLLY_PX : PX_PER_STOP;
 function layout() {
   stopPx = [CRAWL_PX];
   for (let i = 0; i < N - 1; i++) stopPx.push(stopPx[i] + gapPx(i));
-  track.style.height = `calc(100vh + ${endStart() + END_PX + 40}px)`;
 }
+const SYmax = () => endStart() + END_PX;
 function posFromScroll(y) {
   if (y <= stopPx[0]) return 0;
   for (let i = 0; i < N - 1; i++) {
@@ -362,42 +393,164 @@ function posFromScroll(y) {
   }
   return N - 1;
 }
-const scrollForPos = p => { const i = Math.min(N - 2, Math.floor(p)); return N < 2 ? stopPx[0] : stopPx[i] + (p - i) * gapPx(i); };
 const crawlText = document.getElementById("crawlText"), crawlShade = document.getElementById("crawlShade"), crawlCue = document.getElementById("crawlCue");
 const endText = document.getElementById("endText"), endShade = document.getElementById("endShade");
 function endStart() { return (stopPx.length ? stopPx[N - 1] : CRAWL_PX + (N - 1) * PX_PER_STOP) + PX_PER_STOP * 0.6; }
 function updateCrawl() {
   if (N) {
     // closing crawl: rises from the bottom after the last stop and settles on screen; scrolling back sends it down
-    const t2 = Math.max(0, Math.min(1, (scrollY - endStart()) / END_PX)), eh = endText.offsetHeight, H2 = innerHeight;
+    const t2 = Math.max(0, Math.min(1, (SY - endStart()) / END_PX)), eh = endText.offsetHeight, H2 = innerHeight;
     endText.style.transform = `translateY(${(1 - t2) * (H2 * 1.05) - t2 * (eh * 0.62)}px)`;
     endShade.style.opacity = Math.min(1, t2 * 2.5);
     endText.style.visibility = t2 > 0 ? "visible" : "hidden";
   }
-  const t = Math.max(0, Math.min(1, scrollY / CRAWL_PX));          // 0 = text below the screen, 1 = text gone into the distance
+  const t = Math.max(0, Math.min(1, SY / CRAWL_PX));          // 0 = text below the screen, 1 = text gone into the distance
   const h = crawlText.offsetHeight, H = innerHeight;
   crawlText.style.transform = `translateY(${(1 - t) * (H * 1.05) - t * (h * 1.25)}px)`;
   const fadeOut = Math.max(0, Math.min(1, (t - 0.82) / 0.18));
   crawlText.style.opacity = 1 - fadeOut;
   crawlShade.style.opacity = 1 - fadeOut;
-  crawlCue.style.opacity = scrollY < 12 ? 1 : 0;       // disappears the moment the visitor starts scrolling
+  crawlCue.style.opacity = SY < 12 ? 1 : 0;       // disappears the moment the visitor starts scrolling
 }
-let lastScrollT = 0, scrollDir = 1, progY = null, snapping = false, touching = false;
-function onScroll() {
-  updateCrawl();
+let scrollDir = 1, lastInputT = 0;
+function setSY(y) {
+  y = Math.max(0, Math.min(N ? SYmax() : 1e9, y));
+  if (y === SY) return;
+  SY = y; updateCrawl();
   if (!N) return;
-  if (progY !== null && Math.abs(scrollY - progY) < 2) return;     // our own re-alignment after a glide: not a visitor scroll
-  progY = null;
-  const g = posFromScroll(scrollY);
+  const g = posFromScroll(SY);
   if (g !== goal) scrollDir = Math.sign(g - goal) || scrollDir;
-  goal = g; snapping = false; lastScrollT = performance.now();
-  target = Math.round(goal);
+  goal = g; target = Math.round(goal);
   for (let k = -2; k <= 4; k++) load(target + k);
   updateLoading();
 }
-addEventListener("touchstart", () => { touching = true; }, { passive: true });
-addEventListener("touchend", e => { if (!e.touches.length) { touching = false; lastScrollT = performance.now(); } }, { passive: true });
-addEventListener("touchcancel", () => { touching = false; }, { passive: true });
+
+/* motion of SY:  "hand"  = following a finger or the wheel;  "coast" = gliding onto a panorama (a cubic that starts at
+   the current speed and ends at rest exactly on the stop);  "drift" = slowing down with friction (crawl text, 2025 tab) */
+const M = { mode: "idle", v: 0, wheelTo: 0, lastWheel: 0, lastDy: 0, peak: 0, fromWheel: false, t0: 0, p0: 0, v0: 0, p1: 0, T: 1, samples: [] };
+function sample(now) { M.samples.push([now, SY]); while (M.samples.length > 2 && now - M.samples[0][0] > 90) M.samples.shift(); }
+function handSpeed() {                              // px per second over the last ~90 ms of input
+  const a = M.samples[0], b = M.samples[M.samples.length - 1];
+  return a && b && b[0] - a[0] > 8 ? (b[1] - a[1]) / ((b[0] - a[0]) / 1000) : 0;
+}
+// pick the panorama to land on, from where the motion is heading
+function landing(v) {
+  const proj = Math.max(0, Math.min(SYmax(), SY + v * 0.28));
+  if (proj <= stopPx[0] || proj >= stopPx[N - 1] || SY < stopPx[0] - 1 || SY > stopPx[N - 1] + 1) return null;
+  let g = 0; while (g < N - 2 && proj >= stopPx[g + 1]) g++;
+  if (!hasDolly(g)) return null;
+  const f = (proj - stopPx[g]) / gapPx(g);
+  let dir = Math.abs(v) > 60 ? Math.sign(v) : scrollDir;
+  if (Math.abs(v) <= 60) {                          // came to rest by hand: carry on, unless it only grazed the stretch
+    const done = dir > 0 ? f : 1 - f;
+    if (done < 0.05) dir = -dir;
+  }
+  if (dir > 0) return f < 0.04 ? g : g + 1;         // just past a stop: settle back onto it
+  return f > 0.96 ? g + 1 : g;
+}
+function release(v) {
+  const L = N ? landing(v) : null;
+  if (L === null) { M.mode = Math.abs(v) > 30 ? "drift" : "idle"; M.v = v; return; }
+  const p1 = stopPx[L], d = p1 - SY;
+  if (Math.abs(d) < 0.5 && Math.abs(v) < 30) { setSY(p1); M.mode = "idle"; return; }
+  // duration: constant deceleration would take 2d/v; keep it between a quick settle and a calm ~1.3 s glide
+  const sameWay = Math.sign(v) === Math.sign(d) && Math.abs(v) > 1;
+  let T = sameWay ? 2 * Math.abs(d) / Math.abs(v) : 0;
+  const calm = 0.45 + 0.85 * Math.min(1, Math.abs(d) / gapPx(Math.min(N - 2, Math.max(0, L - (d > 0 ? 1 : 0)))));
+  T = Math.max(0.35, Math.min(1.4, sameWay ? Math.max(T, 0.35) : calm));
+  // a fast arrival should not overshoot: a cubic overshoots when v*T > 3d
+  if (sameWay && Math.abs(v) * T > 2.6 * Math.abs(d)) T = 2.6 * Math.abs(d) / Math.abs(v);
+  Object.assign(M, { mode: "coast", t0: performance.now(), p0: SY, v0: v, p1, T: Math.max(0.2, T) });
+}
+function coastTo(stop) { if (N) { scrollDir = Math.sign(stopPx[stop] - SY) || scrollDir; Object.assign(M, { mode: "coast", t0: performance.now(), p0: SY, v0: 0, p1: stopPx[stop], T: 0.9 }); } }
+function stepMotion(now, dt) {
+  if (M.mode === "wheel") {
+    const y = SY + (M.wheelTo - SY) * (1 - Math.exp(-dt / 0.08));
+    setSY(Math.abs(M.wheelTo - y) < 0.5 ? M.wheelTo : y); sample(now);
+    if (now - M.lastWheel > 90) { release(handSpeed()); M.fromWheel = true; }   // the wheel has gone quiet: hand over without losing speed
+  } else if (M.mode === "coast") {
+    const t = Math.min(1, (now - M.t0) / 1000 / M.T), T = M.T, d = M.p1 - M.p0;
+    // cubic Hermite: starts at p0 with speed v0, ends at p1 at rest
+    const h10 = t * t * t - 2 * t * t + t, h01 = -2 * t * t * t + 3 * t * t;
+    setSY(M.p0 + h01 * d + h10 * M.v0 * T);
+    if (t >= 1) { setSY(M.p1); M.mode = "idle"; }
+  } else if (M.mode === "drift") {
+    M.v *= Math.exp(-dt / 0.32); setSY(SY + M.v * dt);
+    if (Math.abs(M.v) < 25) { M.mode = "idle"; release(0); }
+  }
+}
+function inputStarted() { lastInputT = performance.now(); hideNudge(); }
+/* "Scroll to continue" reminder: shown after a few quiet seconds standing at a panorama */
+const NUDGE_MS = 6000, nudgeEl = document.getElementById("nudge");
+function hideNudge() { nudgeEl.classList.remove("on"); }
+function updateNudge(now) {
+  const resting = N && !moving && M.mode === "idle" && goal === cur && SY >= stopPx[0] - 1 && cur < N - 1 && !pop.classList.contains("open");
+  const show = resting && now - lastInputT > NUDGE_MS && !(dragging || T0) && !mapBig;
+  if (show !== nudgeEl.classList.contains("on")) nudgeEl.classList.toggle("on", show);
+}
+const TOUCHY = matchMedia("(hover: none)").matches || MOBILE;
+if (TOUCHY) {
+  document.getElementById("nudgeText").textContent = "Swipe up to continue"; document.getElementById("nudgeArrow").innerHTML = "&uarr;";
+  document.getElementById("hudLabel").textContent = "Swipe up to walk";
+}
+
+/* wheel / trackpad (desktop) */
+document.getElementById("stage").addEventListener("wheel", e => {
+  if (!N || pop.classList.contains("open")) return;
+  e.preventDefault(); inputStarted();
+  const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1), now = performance.now();
+  // trackpads keep sending a fading "inertia" tail after the fingers lift: once we are gliding, let the glide finish
+  // instead of following the tail (that slow creep is what feels like a stall)
+  const tail = Math.abs(dy) <= Math.abs(M.lastDy) * 1.05 && Math.sign(dy) === Math.sign(M.lastDy) && now - M.lastWheel < 120;
+  M.lastDy = dy;
+  if (M.mode === "coast" && M.fromWheel && tail) { M.lastWheel = now; return; }
+  if (M.mode !== "wheel") { M.mode = "wheel"; M.wheelTo = SY; M.samples = []; M.peak = 0; }
+  M.peak = Math.max(M.peak, Math.abs(dy));
+  M.wheelTo = Math.max(0, Math.min(SYmax(), M.wheelTo + dy)); M.lastWheel = now;
+  if (tail && M.peak > 20 && Math.abs(dy) < M.peak * 0.18) { stepMotion(now, 0); release(handSpeed()); M.fromWheel = true; }
+}, { passive: false });
+/* keys: down / page down / space = on to the next panorama, up / page up = back */
+addEventListener("keydown", e => {
+  if (!N || pop.classList.contains("open") || e.target.closest && e.target.closest("button, #hot")) return;
+  const k = e.key, fwd = ["ArrowDown", "PageDown", " "].includes(k), back = ["ArrowUp", "PageUp"].includes(k);
+  if (!fwd && !back) return;
+  e.preventDefault(); inputStarted();
+  if (SY < stopPx[0]) { if (back) return; Object.assign(M, { mode: "coast", t0: performance.now(), p0: SY, v0: 0, p1: Math.min(stopPx[0], SY + innerHeight * 0.8), T: 0.6 }); return; }
+  const here = Math.round(goal);
+  coastTo(Math.max(0, Math.min(N - 1, fwd ? (goal >= here ? here + 1 : here) : (goal <= here ? here - 1 : here))));
+});
+/* touch (phones, tablets): the tour handles it itself. Early in each swipe it decides: mostly sideways = look around
+   (and never walk); otherwise = walk. A lifted finger hands its speed to the glide onto the next panorama. */
+const TOUCH_GAIN = 1;
+let T0 = null;
+document.getElementById("stage").addEventListener("touchstart", e => {
+  if (pop.classList.contains("open") || e.touches.length !== 1) { T0 = null; return; }
+  const t = e.touches[0];
+  T0 = { x: t.clientX, y: t.clientY, lx: t.clientX, sy: SY, lock: null };
+  if (M.mode !== "idle") M.mode = "idle";           // a finger on the glass catches the motion where it is
+  M.fromWheel = false;
+  M.samples = []; sample(performance.now()); inputStarted();
+}, { passive: true });
+document.getElementById("stage").addEventListener("touchmove", e => {
+  if (!T0 || e.touches.length !== 1) return;
+  const t = e.touches[0], dx = t.clientX - T0.x, dy = t.clientY - T0.y;
+  if (!T0.lock && Math.hypot(dx, dy) > 9) T0.lock = Math.abs(dx) > Math.abs(dy) * 0.7 ? "look" : "walk";   // generous to looking
+  if (e.cancelable) e.preventDefault();
+  if (T0.lock === "walk") { setSY(T0.sy - dy * TOUCH_GAIN); sample(performance.now()); }
+  else if (T0.lock === "look") {
+    const k = 0.8 * fov / innerWidth, ddx = t.clientX - T0.lx;
+    if (moving) look -= ddx * k; else yaw -= ddx * k;
+  }
+  T0.lx = t.clientX;
+}, { passive: false });
+function touchDone() {
+  if (!T0) return;
+  const lock = T0.lock; T0 = null;
+  if (lock === "walk") { sample(performance.now()); release(handSpeed()); }
+  else if (goal !== Math.round(goal)) release(0);    // looked around mid-walk: carry on to the panorama
+}
+document.getElementById("stage").addEventListener("touchend", e => { if (!e.touches.length) touchDone(); }, { passive: true });
+document.getElementById("stage").addEventListener("touchcancel", () => touchDone(), { passive: true });
 function go(i) {
   if (i === cur || !T(i)) return;
   dropHero(); prevTex = T(cur); prev = cur; cur = i; fade = 0; fadeStart = performance.now();
@@ -467,24 +620,13 @@ function startDolly() {
   look = wrap(yaw - viewYaw(cur)); lookP = pitch;       // where the visitor was looking eases back to the walking direction
 }
 function arrive(i) {
-  moving = false; snapping = false; cur = i; pos = i; prev = i; prevTex = null; fade = 1;
+  moving = false; cur = i; pos = i; prev = i; prevTex = null; fade = 1;
   yaw = viewYaw(i) + look; pitch = lookP; look = 0; lookP = 0;
   lastStep = performance.now(); updateLoading();
   if (EDIT) updateEdit();
 }
 function stepDolly(now, dt) {
-  // a visitor who has stopped scrolling between stills glides on (in the direction they were going) to the next panorama
-  if (!touching && progY === null && now - lastScrollT > IDLE_MS && !snapping) {
-    const fl = Math.floor(goal);
-    if (goal !== fl && hasDolly(fl)) {
-      // only grazed the stretch (an accidental nudge): settle back; otherwise carry on to the next panorama
-      const f = scrollDir > 0 ? goal - fl : Math.ceil(goal) - goal;
-      const to = (scrollDir > 0) === (f >= 0.05) ? Math.ceil(goal) : fl;
-      snapping = true; goal = to; target = to;
-      progY = Math.round(scrollForPos(to)); scrollTo(0, progY);
-    }
-  }
-  // a big jump (scroll bar dragged, a hard fling): dissolve straight there instead of walking the whole way
+  // a big jump (a long key press, the edit buttons): dissolve straight there instead of walking the whole way
   if (Math.abs(goal - (moving ? pos : cur)) > 3.5) {
     const want = Math.max(0, Math.min(N - 1, Math.round(goal)));
     if (moving) arrive(Math.round(pos));
@@ -505,15 +647,16 @@ function stepDolly(now, dt) {
   let to = goal;
   if (to > pos) { let s = Math.floor(pos); while (s < to && hasDolly(s)) s++; to = Math.min(to, s); }
   else if (to < pos) { let s = Math.ceil(pos); while (s > to && hasDolly(s - 1)) s--; to = Math.max(to, s); }
-  const TAU = snapping ? 0.2 : 0.11, VMAX = snapping ? 1.15 : 2.6, VMIN = snapping ? 0.32 : 0.05;   // stops per second
-  let st = (to - pos) * (1 - Math.exp(-dt / TAU));
-  const mag = Math.min(Math.abs(to - pos), Math.max(VMIN * dt, Math.min(VMAX * dt, Math.abs(st))));
-  let np = Math.abs(to - pos) < 0.002 ? to : pos + Math.sign(to - pos) * mag;
-  if (framesReady(np)) pos = np;                             // the next frames are not here yet: wait for them
-  document.getElementById("loading").textContent = framesReady(np) ? "" : "Loading…";
-  if (!dragging) { const kk = Math.exp(-dt / 0.35); look *= kk; lookP *= kk; }
+  // the view follows the (already smooth) motion exactly; only a sudden jump is caught up at walking pace
+  const VCATCH = 3.5;                                          // stops per second
+  const np = Math.abs(to - pos) <= VCATCH * dt ? to : pos + Math.sign(to - pos) * VCATCH * dt;
+  const ready = framesReady(np);
+  if (ready) pos = np;                                         // the next frames are not here yet: wait for them
+  document.getElementById("loading").textContent = ready ? "" : "Loading…";
+  if (!dragging && !(T0 && T0.lock === "look")) { const kk = Math.exp(-dt / 0.35); look *= kk; lookP *= kk; }
   if (pos === to && to === Math.round(to) && (to === goal || !hasDolly(Math.sign(goal - to) > 0 ? to : to - 1))) arrive(to);
 }
+
 /* ---------------- hero first views: loaded when a stop is reached, faded in, freed when you move on ---------------- */
 const HERO_FADE_MS = 280, NOHERO = /[?&]nohero\b/.test(location.search);   // ?nohero = compare without
 let hero = { key: "", tex: null, b: null, tH: 1, tV: 1, mix: 0, t0: 0, want: "" };
@@ -545,6 +688,7 @@ function updateHero() {
 let dragging = null;
 const TAP_PX = 10;                                  // moves shorter than this count as a tap
 function startDrag(e, popup) {
+  if (e.pointerType === "touch") return;
   if (e.button !== undefined && e.button > 0) return;
   dragging = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: 0, popup };
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}   // the drag keeps going even as outlines redraw under the finger
@@ -587,14 +731,14 @@ function hitTest(x, y) {
 let touchTap = null;
 const stageEl = document.getElementById("stage");
 stageEl.addEventListener("touchstart", e => {
-  touchTap = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: performance.now(), sy: scrollY } : null;
+  touchTap = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: performance.now(), sy: SY } : null;
 }, { passive: true });
 stageEl.addEventListener("touchmove", e => {
   if (touchTap && e.touches.length === 1 && Math.hypot(e.touches[0].clientX - touchTap.x, e.touches[0].clientY - touchTap.y) > 14) touchTap = null;
 }, { passive: true });
 stageEl.addEventListener("touchend", e => {
   const t = touchTap; touchTap = null;
-  if (!t || pop.classList.contains("open") || performance.now() - t.t > 700 || Math.abs(scrollY - t.sy) > 14) return;
+  if (!t || pop.classList.contains("open") || performance.now() - t.t > 700 || Math.abs(SY - t.sy) > 14) return;
   const p = hitTest(t.x, t.y);
   if (p) { e.preventDefault(); dragging = null; canvas.classList.remove("drag"); openPopup(p); }   // preventDefault: no ghost click afterwards
 }, { passive: false });
@@ -640,11 +784,13 @@ function hull(ps) {
   return lo.slice(0, -1).concat(up.slice(0, -1));
 }
 let hotKey = "", hotShapes = [];
-const opened = new Set();            // works already opened: their outline stops breathing
+const opened = new Set();
+const BADGE_R = MOBILE ? 15 : 13;            // works already opened: their outline stops breathing
 function drawHot(b, tH, tV) {
-  if (moving || fade < 1 || scrollY < CRAWL_PX * 0.9 || scrollY > endStart() + END_PX * 0.15) { hotShapes = []; if (hotKey) { hot.innerHTML = ""; hotKey = ""; } return; }
+  if (moving || fade < 1 || SY < CRAWL_PX * 0.9 || SY > endStart() + END_PX * 0.15) { hotShapes = []; if (hotKey) { hot.innerHTML = ""; hotKey = ""; } return; }
   const spots = data.stops[cur].spots.filter(s => POPUPS[s.popup]);
-  let html = ""; hotShapes = [];
+  let html = ""; hotShapes = []; const badges = [], placed = [];
+  const mapRect = mapBtn.classList.contains("show") && !mapBig ? mapBtn.getBoundingClientRect() : null;
   for (const s of spots) {
     const pts = clipProject(s.dirs, b, tH, tV);
     if (pts.length < 3) continue;
@@ -654,19 +800,80 @@ function drawHot(b, tH, tV) {
     // the outline is redrawn as the view moves; a negative delay keeps the breathing continuous instead of restarting
     const pa = pulse ? ` class="pulse" style="animation-delay:-%D%s"` : "";
     html += `<polygon${pa} tabindex="0" role="button" aria-label="${title}" data-p="${s.popup}" points="${h.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ")}"/>`;
+    // badge: a "+" at the work's top-right corner, so every work with a pop-up is marked the same way
+    let x1 = -1e9, y0 = 1e9; for (const p of h) { x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); }
+    const bx = Math.max(BADGE_R + 6, Math.min(innerWidth - BADGE_R - 6, x1 - BADGE_R * 0.35));
+    let by = Math.max(BADGE_R + 6, Math.min(innerHeight - BADGE_R - 70, y0 + BADGE_R * 0.35));
+    for (let tries = 0; tries < 6 && placed.some(q => Math.hypot(q[0] - bx, q[1] - by) < BADGE_R * 2 + 6); tries++) by += BADGE_R * 2 + 8;   // two works close together: stack, never overlap
+    if (mapRect && bx - BADGE_R < mapRect.right + 4 && by - BADGE_R < mapRect.bottom + 4) by = mapRect.bottom + BADGE_R + 8;
+    placed.push([bx, by]);
+    badges.push(`<g class="badge" data-p="${s.popup}" transform="translate(${bx.toFixed(1)},${by.toFixed(1)})" aria-hidden="true"><circle r="${BADGE_R}" data-p="${s.popup}"/><path d="M-${BADGE_R * 0.42},0H${BADGE_R * 0.42}M0,-${BADGE_R * 0.42}V${BADGE_R * 0.42}" data-p="${s.popup}"/></g>`);
+    const ring = []; for (let a = 0; a < 12; a++) ring.push([bx + Math.cos(a / 12 * 6.283) * (BADGE_R + 6), by + Math.sin(a / 12 * 6.283) * (BADGE_R + 6)]);
+    hotShapes.push({ p: s.popup, h: ring });
   }
+  html += badges.join("");
   if (html !== hotKey) { hot.innerHTML = html.split("%D%").join(((performance.now() % 1600) / 1000).toFixed(2)); hotKey = html; }
 }
 hot.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset.p) { e.preventDefault(); openPopup(e.target.dataset.p); } });
 
+/* ---------------- floor plan ---------------- */
+const mapBtn = document.getElementById("mapBtn"), mapSvg = document.getElementById("map");
+let PLAN = null, mapBig = false;
+fetch("plan.json").then(r => r.ok ? r.json() : null).catch(() => null).then(p => {
+  if (!p) return;
+  PLAN = p;
+  const img = document.getElementById("mapImg");
+  img.setAttribute("href", p.img); img.setAttribute("width", p.w); img.setAttribute("height", p.h);
+  document.getElementById("routeAll").setAttribute("points", p.path.map(q => q.join(",")).join(" "));
+  setMapView();
+});
+function setMapView() {
+  if (!PLAN) return;
+  if (mapBig) { mapSvg.setAttribute("viewBox", `0 0 ${PLAN.w} ${PLAN.h}`); return; }
+  // small: just the part of the floor around the route
+  const xs = PLAN.stops.map(q => q[0]), ys = PLAN.stops.map(q => q[1]);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const side = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * 1.35;
+  mapSvg.setAttribute("viewBox", `${(cx - side / 2).toFixed(0)} ${(cy - side / 2).toFixed(0)} ${side.toFixed(0)} ${side.toFixed(0)}`);
+}
+mapBtn.addEventListener("click", () => {
+  mapBig = !mapBig; mapBtn.classList.toggle("big", mapBig); mapBtn.setAttribute("aria-expanded", mapBig);
+  document.getElementById("mapCap").textContent = mapBig
+    ? `The walkthrough follows this set path through the galleries. ${TOUCHY ? "Swipe up" : "Scroll"} to move along it; drag to look around. Other galleries are not part of this tour.`
+    : "Your route";
+  setMapView();
+});
+mapBtn.addEventListener("touchstart", e => e.stopPropagation(), { passive: true });
+let mapKey = "";
+function updateMap() {
+  if (!PLAN || !N) return;
+  const on = SY > CRAWL_PX * 0.85 && SY < endStart() + END_PX * 0.2;
+  if (on !== mapBtn.classList.contains("show")) { mapBtn.classList.toggle("show", on); if (!on && mapBig) mapBtn.click(); }
+  const P = PLAN.path, p = Math.max(0, Math.min(P.length - 1, (moving ? pos : cur) * PLAN.sub)), i = Math.min(P.length - 2, Math.floor(p)), f = p - i, S = P;
+  const x = S[i][0] + (S[i + 1][0] - S[i][0]) * f, y = S[i][1] + (S[i + 1][1] - S[i][1]) * f;
+  const key = `${x.toFixed(1)},${y.toFixed(1)},${yaw.toFixed(0)}`;
+  if (key === mapKey) return; mapKey = key;
+  const here = document.getElementById("here"); here.setAttribute("cx", x); here.setAttribute("cy", y);
+  document.getElementById("routeDone").setAttribute("points", S.slice(0, i + 1).map(q => q.join(",")).concat([`${x},${y}`]).join(" "));
+  // view cone: plan x/y run with Unreal's x/y, so the camera yaw points straight onto the plan
+  const a = yaw * Math.PI / 180, h = (fov / 2) * Math.PI / 180, L = 34;
+  document.getElementById("cone").setAttribute("d", `M${x},${y}L${x + L * Math.cos(a - h)},${y + L * Math.sin(a - h)}A${L},${L} 0 0 1 ${x + L * Math.cos(a + h)},${y + L * Math.sin(a + h)}Z`);
+}
+
 /* ---------------- frame loop ---------------- */
+const countEl = document.getElementById("count");
 function frame(now) {
   requestAnimationFrame(frame);
   if (!N || !T(cur)) return;
   const dt = Math.min(0.05, Math.max(0, (now - (lastNow || now)) / 1000)); lastNow = now;
   if (fade < 1) fade = Math.min(1, (now - fadeStart) / FADE_MS);
   if (data.dolly) wantStills(now);
+  stepMotion(now, dt);
   stepDolly(now, dt);
+  updateNudge(now);
+  updateMap();
+  const cnt = `Stop ${Math.min(N, Math.round(moving ? pos : cur) + 1)} of ${N}`;
+  if (countEl.textContent !== cnt) countEl.textContent = cnt;
   document.getElementById("prog").style.width = (100 * (moving ? pos : cur) / Math.max(1, N - 1)) + "%";
   if (moving) {
     // walking: two neighbouring frames, blended by how far between them we are
@@ -740,7 +947,7 @@ function switchShow(id) {
     const keepYaw = yaw, keepPitch = pitch, oldTex = T(cur);
     dropHero(); show = sh; data = d; buildShowTabs();
     for (const t of stillTex.values()) gl.deleteTexture(t); stillTex.clear();
-    if (scrollY >= CRAWL_PX) { layout(); goal = target = cur; progY = Math.round(stopPx[cur]); scrollTo(0, progY); } else layout();
+    M.mode = "idle"; layout(); if (SY >= CRAWL_PX) { SY = -1; setSY(stopPx[cur]); goal = target = cur; }
     try { history.replaceState(null, "", "#" + sh.id); } catch (_) {}
     hotKey = ""; hot.innerHTML = "";
     for (let k = -2; k <= 4; k++) load(target + k);
@@ -766,7 +973,6 @@ fetch("versions.json").then(r => r.ok ? r.json() : null).catch(() => null).then(
   updateCrawl();
   if (EDIT) setupEdit();
   resize(); addEventListener("resize", resize);
-  addEventListener("scroll", onScroll, { passive: true });
   target = 0; for (let k = 0; k < 5; k++) load(k);
   const first = setInterval(() => { if (T(0)) { clearInterval(first); cur = 0; fade = 1; updateLoading(); } }, 50);
   requestAnimationFrame(frame);
@@ -781,7 +987,7 @@ function setupEdit() {
     <button class="btn" id="eSet">Set as first view</button>
     <button class="btn" id="eCopy">Copy all views</button>`;
   document.getElementById("stage").appendChild(editEl);
-  const jump = k => scrollTo(0, stopPx[Math.max(0, Math.min(N - 1, cur + k))]);
+  const jump = k => { M.mode = "idle"; setSY(stopPx[Math.max(0, Math.min(N - 1, cur + k))]); };
   editEl.querySelector("#ePrev").onclick = () => jump(-1);
   editEl.querySelector("#eNext").onclick = () => jump(1);
   editEl.querySelector("#eSet").onclick = () => { data.stops[cur].view = { yaw: +(((yaw + 540) % 360) - 180).toFixed(1), pitch: +pitch.toFixed(1), set: true }; updateEdit(); };
